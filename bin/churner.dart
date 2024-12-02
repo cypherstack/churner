@@ -1,9 +1,7 @@
-import 'dart:ffi';
 import 'dart:io';
 
 import 'package:args/args.dart';
 import 'package:cs_monero/cs_monero.dart';
-import 'package:cs_monero/src/ffi_bindings/generated_bindings_monero.g.dart';
 import 'package:cs_monero/src/ffi_bindings/monero_bindings_base.dart';
 
 const String version = '0.0.1';
@@ -60,12 +58,8 @@ void main(List<String> arguments) {
             .join(Platform.pathSeparator);
 
     // override here as cs_monero normally uses flutter to bundle the lib
-    manuallySetBindings(
-      FfiMoneroC(
-        DynamicLibrary.open(
-          thisDirPath + Platform.pathSeparator + _libName,
-        ),
-      ),
+    manuallyOverrideLibPath(
+      thisDirPath + Platform.pathSeparator + _libName,
     );
 
     final walletExists = MoneroWallet.isWalletExist("lol");
