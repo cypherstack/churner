@@ -1,4 +1,10 @@
+import 'dart:ffi';
+import 'dart:io';
+
 import 'package:args/args.dart';
+import 'package:cs_monero/cs_monero.dart';
+import 'package:cs_monero/src/ffi_bindings/generated_bindings_monero.g.dart';
+import 'package:cs_monero/src/ffi_bindings/monero_bindings_base.dart';
 
 const String version = '0.0.1';
 
@@ -47,6 +53,24 @@ void main(List<String> arguments) {
       verbose = true;
     }
 
+    // set path of .so lib
+    final thisDirPath = Platform.pathSeparator +
+        Platform.script.pathSegments
+            .sublist(0, Platform.script.pathSegments.length - 1)
+            .join(Platform.pathSeparator);
+
+    // override here as cs_monero normally uses flutter to bundle the lib
+    manuallySetBindings(
+      FfiMoneroC(
+        DynamicLibrary.open(
+          thisDirPath + Platform.pathSeparator + _libName,
+        ),
+      ),
+    );
+
+    final walletExists = MoneroWallet.isWalletExist("lol");
+    print("Wallet exists: $walletExists"); // should print out false fir "lol"
+
     // Act on the arguments provided.
     print('Positional arguments: ${results.rest}');
     if (verbose) {
@@ -57,5 +81,17 @@ void main(List<String> arguments) {
     print(e.message);
     print('');
     printUsage(argParser);
+  }
+}
+
+String get _libName {
+  if (Platform.isWindows) {
+    return 'monero_libwallet2_api_c.dll';
+  } else if (Platform.isLinux) {
+    return 'monero_libwallet2_api_c.so';
+  } else {
+    throw UnsupportedError(
+      "Platform \"${Platform.operatingSystem}\" is not supported",
+    );
   }
 }
