@@ -2,3 +2,5 @@
 # Created by `dart pub`
 .dart_tool/
 build
+bin/monero_libwallet2_api_c.so
+bin/monero_libwallet2_api_c.dll
