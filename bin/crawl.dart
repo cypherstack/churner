@@ -80,7 +80,7 @@ class KeyImageDatabase {
   Future<void> insertOutputPublicKey(
       String outputPublicKey, int blockHeight) async {
     await _db.execute(
-      'INSERT OR IGNORE INTO key_images (key_image, block_height) VALUES (?, ?)',
+      'INSERT OR REPLACE INTO key_images (key_image, block_height) VALUES (?, ?)',
       [outputPublicKey, blockHeight],
     );
   }
@@ -198,11 +198,21 @@ class KeyImageDatabase {
   }
 
   /// Rescans the blockchain starting from the RingCT activation height.
-  Future<void> rescan() async {
+  /// If [fullRescan] is true (default), deletes all data and starts over.
+  /// If [fullRescan] is false, keeps existing data and overwrites from the specified height onward.
+  Future<void> rescan({bool fullRescan = true}) async {
     print('Rescanning the blockchain from RingCT activation height...');
     try {
-      // Delete all data from the key_images table.
-      await _db.execute('DELETE FROM key_images');
+      if (fullRescan) {
+        // Delete all data from the key_images table.
+        await _db.execute('DELETE FROM key_images');
+      } else {
+        // Delete data from the key_images table from the RingCT activation height onward.
+        await _db.execute(
+          'DELETE FROM key_images WHERE block_height >= ?',
+          [ringCtActivationHeight],
+        );
+      }
 
       // Reset the synced height in the sync_state table.
       await _db.execute('UPDATE sync_state SET synced_height = ? WHERE id = 1',
@@ -231,9 +241,13 @@ void main() async {
 
   await db.init();
 
-  // To perform a rescan, uncomment the following line:
+  // To perform a rescan, uncomment one of the following lines:
+
+  // Full rescan (delete all data and start over):
   // await db.rescan();
-  // TODO: Attach to commandline parameter-/feature-flag.
+
+  // Partial rescan (overwrite data from RingCT activation height onward):
+  // await db.rescan(fullRescan: false);
 
   await db.refresh();
 
