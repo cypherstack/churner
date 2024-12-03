@@ -138,6 +138,7 @@ class KeyImageDatabase {
         final blockData = jsonDecode(blockJson);
 
         // Process all transactions for any `key`s.
+
         List<Map<String, dynamic>> allTransactions = [];
         final minerTx = blockData['miner_tx'] as Map<String, dynamic>;
         allTransactions.add(minerTx);
@@ -219,6 +220,34 @@ class KeyImageDatabase {
     }
   }
 
+  /// Repairs the database by finding the highest recorded block and continues
+  /// the synchronization process from that point.
+  Future<void> repair() async {
+    print('Starting repair process...');
+    try {
+      // Find the highest block height from the key_images table.
+      final result = await _db.getOptional(
+          'SELECT MAX(block_height) as max_height FROM key_images');
+      int highestBlock = ringCtActivationHeight;
+
+      if (result != null && result['max_height'] != null) {
+        highestBlock = result['max_height'] as int;
+        print('Highest recorded block height is $highestBlock.');
+      } else {
+        print('No key images found. Starting from RingCT activation height.');
+      }
+
+      // Update the synced height in the sync_state table.
+      await _db.execute('UPDATE sync_state SET synced_height = ? WHERE id = 1',
+          [highestBlock]);
+
+      // Continue synchronization from the highest block.
+      await refresh();
+    } catch (e) {
+      print('Error during repair: $e');
+    }
+  }
+
   /// Closes the database connection.
   Future<void> close() async {
     await _db.close();
@@ -237,12 +266,10 @@ void main() async {
   await db.init();
 
   // To perform a rescan, uncomment one of the following lines:
+  // await db.rescan(); // Delete all data and start over.
+  // await db.rescan(fullRescan: false); // Add to/overwrite data from RingCT activation height onward.
 
-  // Full rescan (delete all data and start over):
-  // await db.rescan();
-
-  // Partial rescan (overwrite data from RingCT activation height onward):
-  // await db.rescan(fullRescan: false);
+  // await db.repair(); // Restart
 
   await db.refresh();
 
@@ -253,8 +280,8 @@ void main() async {
   // final height = await db.getBlockHeightByOutputPublicKey(
   //     '240d8b9b00222b81e51b9fda7571f17d672f7ee3bd5ad94d3dfdc81fe04bc98d');
   // print("Height: $height");
-  // ``
-  //
+  // ```
+
   // Proceed to churn.
 
   await db.close();
