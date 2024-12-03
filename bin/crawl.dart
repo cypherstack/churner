@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io'; // Used for db migration.
 
 import 'package:monero_rpc/monero_rpc.dart';
 import 'package:sqlite_async/sqlite_async.dart';
@@ -262,7 +263,105 @@ class KeyImageDatabase {
   }
 }
 
+/// Migrates old key_images.db to new (shiny) pub_keys.db.
+///
+/// This can be removed if you (dear reader) do not have a key_images.db.
+Future<void> migrateKeyImagesToPubKeys({
+  required String oldDbPath,
+  required String newDbPath,
+}) async {
+  if (!File(oldDbPath).existsSync()) {
+    throw Exception('Source database file $oldDbPath does not exist.');
+  }
+
+  // Open connections to the old and new databases.
+  final oldDb = SqliteDatabase(path: oldDbPath);
+  final newDb = SqliteDatabase(path: newDbPath);
+
+  print('Migrating $oldDbPath to $newDbPath...');
+
+  try {
+    // Create the new database schema.
+    final migrations = SqliteMigrations()
+      ..add(SqliteMigration(1, (tx) async {
+        await tx.execute('''
+          CREATE TABLE IF NOT EXISTS pub_keys (
+            pub_key TEXT PRIMARY KEY,
+            block_height INTEGER
+          )
+        ''');
+
+        await tx.execute('''
+          CREATE TABLE IF NOT EXISTS sync_state (
+            id INTEGER PRIMARY KEY,
+            synced_height INTEGER
+          )
+        ''');
+      }));
+
+    print('Migration set up...');
+    await migrations.migrate(newDb);
+
+    print('Getting all keys...');
+    // Migrate data from the old database to the new database.
+    final oldKeyImages = await oldDb.getAll('SELECT * FROM key_images');
+
+    print('Inserting keys...');
+    for (final row in oldKeyImages) {
+      final keyImage = row['key_image'] as String?;
+      final blockHeight = row['block_height'] as int?;
+
+      if (keyImage != null && blockHeight != null) {
+        await newDb.execute(
+          'INSERT INTO pub_keys (pub_key, block_height) VALUES (?, ?)',
+          [keyImage, blockHeight],
+        );
+        print('Migrated $keyImage at height $blockHeight');
+      }
+    }
+
+    // Migrate the sync state if it exists.
+    final oldSyncState = await oldDb.getOptional(
+      'SELECT synced_height FROM sync_state WHERE id = 1',
+    );
+
+    if (oldSyncState != null) {
+      final syncedHeight = oldSyncState['synced_height'] as int;
+      await newDb.execute(
+        'INSERT INTO sync_state (id, synced_height) VALUES (1, ?)',
+        [syncedHeight],
+      );
+    } else {
+      // Set default sync height if no sync state exists.
+      const defaultSyncHeight = 1220516; // RingCT activation height.
+      await newDb.execute(
+        'INSERT INTO sync_state (id, synced_height) VALUES (1, ?)',
+        [defaultSyncHeight],
+      );
+    }
+
+    print('Migration completed successfully.');
+  } catch (e, s) {
+    print('Error during migration: $e');
+    print(s);
+  } finally {
+    // Close database connections.
+    await oldDb.close();
+    await newDb.close();
+  }
+}
+
 void main() async {
+  // If you have an old key_images.db, migrate it using:
+  // try {
+  //   await migrateKeyImagesToPubKeys(
+  //     oldDbPath: 'key_images.db', // Path to the old database.
+  //     newDbPath: 'pub_keys.db', // Path to the new database.
+  //   );
+  // } catch (e) {
+  //   print('Migration failed: $e');
+  // }
+
   final db = KeyImageDatabase(
     dbPath: 'pub_keys.db',
     daemonUrl:
