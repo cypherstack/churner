@@ -169,8 +169,16 @@ class KeyImageDatabase {
           for (var output in vout) {
             final target = output['target'] as Map<String, dynamic>;
 
+            String? keyImage;
+
             if (target.containsKey('key')) {
-              final keyImage = target['key'] as String;
+              keyImage = target['key'] as String;
+            } else if (target.containsKey('tagged_key')) {
+              final taggedKey = target['tagged_key'] as Map<String, dynamic>;
+              keyImage = taggedKey['key'] as String;
+            }
+
+            if (keyImage != null) {
               await insertOutputPublicKey(keyImage, height);
               print('Inserted key image $keyImage at height $height');
             }
@@ -269,7 +277,7 @@ void main() async {
   // await db.rescan(); // Delete all data and start over.
   // await db.rescan(fullRescan: false); // Add to/overwrite data from RingCT activation height onward.
 
-  // await db.repair(); // Restart
+  // await db.repair(); // Restart from the highest-saved block height.
 
   await db.refresh();
 
