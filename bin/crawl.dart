@@ -101,12 +101,14 @@ class KeyImageDatabase {
     final stopwatch = Stopwatch()..start();
     // TODO: Remove.
 
-    // Get the current blockchain height from the daemon
+    // Get the current blockchain height from the daemon.
     Map<String, dynamic> result;
     try {
       result = await _daemonRpc.call('get_info', {});
     } catch (e) {
       print('Error getting blockchain info: $e');
+      stopwatch.stop();
+      print('Total time elapsed: ${stopwatch.elapsed}');
       return;
     }
 
@@ -135,17 +137,13 @@ class KeyImageDatabase {
         final blockJson = blockResult['json'] as String;
         final blockData = jsonDecode(blockJson);
 
-        // Prepare list of transactions to process.
+        // Process all transactions for any `key`s.
         List<Map<String, dynamic>> allTransactions = [];
-
-        // Add miner transaction to the list
         final minerTx = blockData['miner_tx'] as Map<String, dynamic>;
         allTransactions.add(minerTx);
 
-        // Extract transaction hashes and fetch their data.
         final txHashes =
             (blockData['tx_hashes'] as List<dynamic>).cast<String>();
-
         if (txHashes.isNotEmpty) {
           final txsResult =
               await _daemonRpc.postToEndpoint('/get_transactions', {
@@ -163,7 +161,6 @@ class KeyImageDatabase {
           }
         }
 
-        // Process all transactions for any `key`s.
         for (var txData in allTransactions) {
           final vout = txData['vout'] as List<dynamic>;
 
