@@ -161,6 +161,7 @@ class KeyImageDatabase {
           }
         }
 
+        // Process all transactions for any `key`s.
         for (var txData in allTransactions) {
           final vout = txData['vout'] as List<dynamic>;
 
@@ -206,12 +207,6 @@ class KeyImageDatabase {
       if (fullRescan) {
         // Delete all data from the key_images table.
         await _db.execute('DELETE FROM key_images');
-      } else {
-        // Delete data from the key_images table from the RingCT activation height onward.
-        await _db.execute(
-          'DELETE FROM key_images WHERE block_height >= ?',
-          [ringCtActivationHeight],
-        );
       }
 
       // Reset the synced height in the sync_state table.
