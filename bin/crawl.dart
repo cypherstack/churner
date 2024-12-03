@@ -26,8 +26,8 @@ class KeyImageDatabase {
     final migrations = SqliteMigrations()
       ..add(SqliteMigration(1, (tx) async {
         await tx.execute('''
-          CREATE TABLE IF NOT EXISTS key_images (
-            key_image TEXT PRIMARY KEY,
+          CREATE TABLE IF NOT EXISTS pub_keys (
+            pub_key TEXT PRIMARY KEY,
             block_height INTEGER
           )
         ''');
@@ -80,7 +80,7 @@ class KeyImageDatabase {
   Future<void> insertOutputPublicKey(
       String outputPublicKey, int blockHeight) async {
     await _db.execute(
-      'INSERT OR REPLACE INTO key_images (key_image, block_height) VALUES (?, ?)',
+      'INSERT OR REPLACE INTO pub_keys (pub_key, block_height) VALUES (?, ?)',
       [outputPublicKey, blockHeight],
     );
   }
@@ -88,7 +88,7 @@ class KeyImageDatabase {
   /// Retrieves the block height associated with a given output public key.
   Future<int?> getBlockHeightByOutputPublicKey(String outputPublicKey) async {
     final result = await _db.getOptional(
-      'SELECT block_height FROM key_images WHERE key_image = ?',
+      'SELECT block_height FROM pub_keys WHERE pub_key = ?',
       [outputPublicKey],
     );
     return result?['block_height'] as int?;
@@ -169,18 +169,18 @@ class KeyImageDatabase {
           for (var output in vout) {
             final target = output['target'] as Map<String, dynamic>;
 
-            String? keyImage;
+            String? pubKey;
 
             if (target.containsKey('key')) {
-              keyImage = target['key'] as String;
+              pubKey = target['key'] as String;
             } else if (target.containsKey('tagged_key')) {
               final taggedKey = target['tagged_key'] as Map<String, dynamic>;
-              keyImage = taggedKey['key'] as String;
+              pubKey = taggedKey['key'] as String;
             }
 
-            if (keyImage != null) {
-              await insertOutputPublicKey(keyImage, height);
-              print('Inserted key image $keyImage at height $height');
+            if (pubKey != null) {
+              await insertOutputPublicKey(pubKey, height);
+              print('Inserted pub key $pubKey at height $height');
             }
           }
         }
@@ -214,8 +214,8 @@ class KeyImageDatabase {
     print('Rescanning the blockchain from RingCT activation height...');
     try {
       if (fullRescan) {
-        // Delete all data from the key_images table.
-        await _db.execute('DELETE FROM key_images');
+        // Delete all data from the pub_keys table.
+        await _db.execute('DELETE FROM pub_keys');
       }
 
       // Reset the synced height in the sync_state table.
@@ -233,9 +233,9 @@ class KeyImageDatabase {
   Future<void> repair() async {
     print('Starting repair process...');
     try {
-      // Find the highest block height from the key_images table.
-      final result = await _db.getOptional(
-          'SELECT MAX(block_height) as max_height FROM key_images');
+      // Find the highest block height from the pub_keys table.
+      final result = await _db
+          .getOptional('SELECT MAX(block_height) as max_height FROM pub_keys');
       int highestBlock = ringCtActivationHeight;
 
       if (result != null && result['max_height'] != null) {
@@ -264,7 +264,7 @@ class KeyImageDatabase {
 
 void main() async {
   final db = KeyImageDatabase(
-    dbPath: 'key_images.db',
+    dbPath: 'pub_keys.db',
     daemonUrl:
         'http://localhost:18081/json_rpc', // Replace with your Monero daemon URL.
     daemonUsername: 'user', // Replace with your username.
