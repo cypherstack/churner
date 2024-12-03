@@ -98,6 +98,9 @@ class KeyImageDatabase {
   Future<void> refresh() async {
     final cachedHeight = await getSyncedHeight();
 
+    final stopwatch = Stopwatch()..start();
+    // TODO: Remove.
+
     // Get the current blockchain height from the daemon
     Map<String, dynamic> result;
     try {
@@ -111,11 +114,15 @@ class KeyImageDatabase {
 
     if (cachedHeight >= currentHeight) {
       print('Database is already synced to height $currentHeight.');
+      stopwatch.stop();
+      print('Total time elapsed: ${stopwatch.elapsed}');
       return;
     }
 
     print(
         'Syncing blocks from height ${cachedHeight + 1} to $currentHeight...');
+
+    int lastSyncedHeight = cachedHeight;
 
     for (int height = cachedHeight + 1; height <= currentHeight; height++) {
       print('Processing block at height $height');
@@ -170,19 +177,27 @@ class KeyImageDatabase {
             }
           }
         }
+
+        await updateSyncedHeight(height);
+        lastSyncedHeight = height;
       } catch (e, s) {
         print('Error processing block at height $height: $e');
         print(s);
         continue;
       }
 
-      await updateSyncedHeight(height);
-
       // Uncomment for the example in main() below to run quicker (in 2s or so).
       // if (height > 1220591) {
+      //   stopwatch.stop();
+      //   print('Sync completed up to height $lastSyncedHeight.');
+      //   print('Total time elapsed: ${stopwatch.elapsed}');
       //   return;
       // }
     }
+
+    stopwatch.stop();
+    print('Sync completed up to height $lastSyncedHeight.');
+    print('Total time elapsed: ${stopwatch.elapsed}');
   }
 
   /// Rescans the blockchain starting from the RingCT activation height.
@@ -226,10 +241,15 @@ void main() async {
   await db.refresh();
 
   // Now you can query the database for output public keys.
+  //
   // Get the height of a random key image in the database as an example:
+  // ```
   // final height = await db.getBlockHeightByOutputPublicKey(
   //     '240d8b9b00222b81e51b9fda7571f17d672f7ee3bd5ad94d3dfdc81fe04bc98d');
   // print("Height: $height");
+  // ``
+  //
+  // Proceed to churn.
 
   await db.close();
 }
