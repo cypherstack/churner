@@ -87,6 +87,14 @@ packages:
       url: "https://github.com/cypherstack/cs_monero.git"
     source: git
     version: "1.0.0-pre"
+  digest_auth:
+    dependency: transitive
+    description:
+      name: digest_auth
+      sha256: c8f4a8d65300bd58c4a2ca84ea6bd63cb584e8021e5689c600ee7efae34d73ea
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.1"
   ffi:
     dependency: transitive
     description:
@@ -119,6 +127,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.2"
+  http:
+    dependency: transitive
+    description:
+      name: http
+      sha256: b9c29a161230ee03d3ccf545097fccd9b87a5264228c5d348202e0f0c28f9010
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.2.2"
   http_multi_server:
     dependency: transitive
     description:
@@ -207,6 +223,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.0"
+  monero_rpc:
+    dependency: "direct main"
+    description:
+      name: monero_rpc
+      sha256: ec8b5d6d306ac7ed086c2de92b96ef2b6c71a58d3779bc808a8669e4b764127a
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.0"
+  mutex:
+    dependency: transitive
+    description:
+      name: mutex
+      sha256: "8827da25de792088eb33e572115a5eb0d61d61a3c01acbc8bcbe76ed78f1a1f2"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.1.0"
   node_preamble:
     dependency: transitive
     description:
@@ -303,6 +335,30 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.10.0"
+  sqlite3:
+    dependency: transitive
+    description:
+      name: sqlite3
+      sha256: cb7f4e9dc1b52b1fa350f7b3d41c662e75fc3d399555fa4e5efcf267e9a4fbb5
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.5.0"
+  sqlite3_web:
+    dependency: transitive
+    description:
+      name: sqlite3_web
+      sha256: f22d1dda7a40be0867984f55cdf5c2d599e5f05d3be4a642d78f38b38983f554
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.0"
+  sqlite_async:
+    dependency: "direct main"
+    description:
+      name: sqlite_async
+      sha256: d66fb6e6d07c1a834743326c033029f75becbb1fad6823d709f921872abc3d5b
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.11.0"
   stack_trace:
     dependency: transitive
     description:
@@ -424,4 +480,4 @@ packages:
     source: hosted
     version: "3.1.2"
 sdks:
-  dart: ">=3.5.4 <4.0.0"
+  dart: ">=3.5.3 <4.0.0"
