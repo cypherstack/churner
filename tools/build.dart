@@ -2,7 +2,7 @@ import 'dart:io';
 import 'dart:math';
 
 const kMoneroCRepo = "https://github.com/cypherstack/monero_c";
-const kMoneroCHash = "64e4c987561b3aaa9ee1fbf6035a34ec8a18f654";
+const kMoneroCHash = "8ef51f50b00381cfe758273c2baad53be55b89b0";
 
 final envProjectDir = File.fromUri(Platform.script).parent.parent.path;
 
