@@ -192,15 +192,19 @@ Future<void> main(List<String> arguments) async {
     }
     print("Wallet synced.");
 
-    // TODO: Loop this.
-    print("Churning once.");
-    await churnOnce(
-      wallet: wallet,
-      daemonAddress: node,
-      daemonUsername: daemonUsername,
-      daemonPassword: daemonPassword,
-      verbose: verbose,
-    );
+    while (true) {
+      try {
+        await churnOnce(
+            wallet: wallet,
+            daemonAddress: node,
+            daemonUsername: daemonUsername,
+            daemonPassword: daemonPassword,
+            verbose: verbose,
+            waitToCommit: true);
+      } catch (e, s) {
+        print("Error while churning: $e\n$s");
+      }
+    }
   } on FormatException catch (e) {
     // Print usage information if an invalid argument was provided.
     print(e.message);
@@ -218,23 +222,30 @@ Future<void> main(List<String> arguments) async {
 /// 3. Deserialize and inspect decoy offsets.
 /// 4. Use daemon RPC to retrieve out info and remove the real output from the list.
 /// 5. If conditions are met, commit (broadcast) the transaction.
+///
+/// If [waitToCommit] is set to true, we will wait until the decoy output is as
+/// old or older than the real output before committing.  If set to false
+/// (default), if the transaction isn't eligible for churning, we'll just skip
+/// it and move on to the next one.
 Future<void> churnOnce({
   required MoneroWallet wallet,
   required String daemonAddress,
   String? daemonUsername,
   String? daemonPassword,
   bool verbose = false,
+  bool waitToCommit = false,
 }) async {
   final myOutputs = await wallet.getOutputs(
     includeSpent: false,
     refresh: true,
   );
-
   if (myOutputs.isEmpty) {
     throw Exception("No unspent outputs available.");
   }
 
   // Pick an output at random for churning.
+  //
+  // In the future we could select a specific output based on some criteria.
   myOutputs.shuffle();
   final outputToChurn = myOutputs.first;
   if (verbose) {
@@ -242,7 +253,7 @@ Future<void> churnOnce({
         "height: ${outputToChurn.height}, amount: ${outputToChurn.value}");
   }
 
-  final accountIndex = 0; // Could be configurable
+  final accountIndex = 0; // Could be configurable.
   final pending = await wallet.createTx(
     output: Recipient(
       address: wallet
@@ -284,19 +295,20 @@ Future<void> churnOnce({
   final getOutsResult =
       await daemonRpc.getOuts(convertRelativeToAbsolute(relativeOffsets));
   if (getOutsResult.outs.isEmpty) {
-    throw Exception("No outs returned from get_outs call.");
+    throw Exception("No outputs returned from get_outs call.");
   }
 
-  // Identify and remove our real output from the complete list of inputs,
-  // leaving just decoy inputs.
+  // Remove our real input from the list, leaving just decoy inputs.
   final originalLength = getOutsResult.outs.length;
   getOutsResult.outs.removeWhere(
     (o) => o.txid == outputToChurn.hash && o.height == outputToChurn.height,
   );
   final removedCount = originalLength - getOutsResult.outs.length;
   if (verbose) {
-    if (removedCount > 0) {
+    if (removedCount == 1) {
       print("Identified our real output among the decoys and removed it.");
+    } else if (removedCount > 1) {
+      throw Exception("Removed more than one output from the decoys.");
     } else {
       throw Exception("Our real output was not found among the decoys.");
     }
@@ -317,6 +329,14 @@ Future<void> churnOnce({
     print("Transaction broadcasted.");
   } else {
     print("Conditions not met. Not broadcasting this transaction.");
+    if (waitToCommit) {
+      print("Waiting for decoy output to age...");
+      // TODO.
+      print("Decoy output is now as old or older than the real output.");
+      print("Broadcasting transaction...");
+      await wallet.commitTx(pending);
+      print("Transaction broadcasted.");
+    }
   }
 }
 
