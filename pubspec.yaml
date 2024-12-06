@@ -13,7 +13,7 @@ dependencies:
   cs_monero:
     git:
       url: https://github.com/cypherstack/cs_monero.git
-      ref: 1bc17c1e099372115c81c1b2444d0032ac2dbfd9 # Includes deserialization changes.
+      ref: 32ac8c2fe0309b01c6d2860ccd34bbc28a9c7ff7 # Includes deserialization changes.
       path: cs_monero
   monero_rpc: ^1.3.1
 

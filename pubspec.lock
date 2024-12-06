@@ -90,8 +90,8 @@ packages:
     dependency: "direct main"
     description:
       path: cs_monero
-      ref: "1bc17c1e099372115c81c1b2444d0032ac2dbfd9"
-      resolved-ref: "1bc17c1e099372115c81c1b2444d0032ac2dbfd9"
+      ref: "32ac8c2fe0309b01c6d2860ccd34bbc28a9c7ff7"
+      resolved-ref: "32ac8c2fe0309b01c6d2860ccd34bbc28a9c7ff7"
       url: "https://github.com/cypherstack/cs_monero.git"
     source: git
     version: "1.0.0-pre.1"
