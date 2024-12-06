@@ -478,7 +478,7 @@ Future<bool> checkChurnConditionsAndWaitIfNeeded({
     print("\nAge analysis:");
     print("   Current block height: $currentHeight");
     print("   Real input (X) block height: ${outputToChurn.height}");
-    print("   Decoy input (Y) block height: ${decoyHeight}");
+    print("   Decoy input (Y) block height: $decoyHeight");
     print("   Age of real input (X): $ageX blocks");
     print("   Age of decoy input (Y): $ageY blocks");
     print("\nPrivacy calculation:");
