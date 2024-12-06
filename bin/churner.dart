@@ -10,6 +10,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:args/args.dart';
+import 'package:ascii_qr/ascii_qr.dart';
 import 'package:cs_monero/cs_monero.dart';
 import 'package:cs_monero/src/ffi_bindings/monero_bindings_base.dart';
 import 'package:monero_rpc/monero_rpc.dart';
@@ -282,9 +283,12 @@ Future<void> churnOnce({
   if (myOutputs.isEmpty) {
     print(
         "No unspent outputs available.  Please send funds to this address:\n");
-    print(wallet
+
+    final String address = wallet
         .getAddress()
-        .value); // TODO: If account is made configurable elsewhere we should respect that here, too.
+        .value; // TODO: If account is made configurable elsewhere we should respect that here, too.
+    print(address);
+    print(AsciiQrGenerator.generate("monero:$address"));
 
     // Delay for a bit before checking again.
     await Future.delayed(const Duration(seconds: 30));

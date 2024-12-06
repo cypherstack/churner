@@ -2,14 +2,14 @@ name: churner
 description: A sample command-line application with basic argument parsing.
 version: 0.0.1
 publish_to: none
-# repository: https://github.com/my_org/my_repo
+repository: https://github.com/cypherstack/churner
 
 environment:
   sdk: ^3.5.4
 
-# Add regular dependencies here.
 dependencies:
   args: ^2.4.2
+  ascii_qr: ^1.0.1
   cs_monero:
     git:
       url: https://github.com/cypherstack/cs_monero.git
