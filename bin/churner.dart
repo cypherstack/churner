@@ -1,9 +1,10 @@
 // General churning flow:
 //
-// 1. Sync a wallet.
-// 2. Create but do not broadcast a transaction spending one output/key image.
-// 3. Get the block height associated with one of the decoy inputs.
-// 4. Broadcast tx when the decoy input is as old or older than the real input.
+// With a synced wallet,
+// 1. Create but do not broadcast a transaction spending one output/key image.
+// 2. Get the block height associated with one of the decoy inputs.
+// 3. Broadcast tx when the decoy input is as old or older than the real input.
+// 4. Repeat.
 
 import 'dart:io';
 
@@ -118,7 +119,7 @@ Future<void> main(List<String> arguments) async {
             ? null
             : results["node-pass"] as String;
     final network = int.tryParse(results["network"] as String) ?? 0;
-    final ssl = results["ssl"] as bool ?? true;
+    final ssl = results["ssl"] as bool;
     final trusted = results["trusted"] as bool? ?? false;
 
     if (verbose) {
@@ -182,93 +183,24 @@ Future<void> main(List<String> arguments) async {
 
     wallet.startAutoSaving();
 
-    // TODO wait for syncing to complete. Either using listeners or polling wallet.isSynced()
-
-    final myOutputs = await wallet.getOutputs(
-      includeSpent: false,
-      refresh: true,
-    );
-    if (myOutputs.isEmpty) {
-      throw Exception("No unspent outputs available.");
-    }
-    myOutputs.shuffle();
-    final outputToChurn = myOutputs.first;
-
-    final accountIndex = 0; // TODO make this an arg?
-
-    final pending = await wallet.createTx(
-      output: Recipient(
-        address: wallet
-            .getAddress(
-              accountIndex: accountIndex,
-            )
-            .value,
-        amount: outputToChurn.value,
-      ),
-      priority: TransactionPriority.normal, // TODO make this an arg?
-      accountIndex: accountIndex,
-      preferredInputs: [outputToChurn],
-      sweep: true,
-    );
-
-    // Deserialize the transaction to get the decoy inputs and key offsets.
-    final deserializedTx = DeserializedTransaction.deserialize(pending.hex);
-
-    // Extract key offsets from the first TxinToKey input (for demo).
-    List<int>? relativeOffsets;
-    for (var input in deserializedTx.vin) {
-      if (input is TxinToKey) {
-        print("Key Image: ${_bytesToHex(input.keyImage)}");
-        print("Key Offsets: ${input.keyOffsets}");
-        relativeOffsets = input.keyOffsets.map((e) => e.toInt()).toList();
-        break; // just take the first input for demonstration.
+    // Wait for syncing to complete.
+    while (!(await wallet.isSynced())) {
+      if (verbose) {
+        print("Wallet syncing...");
       }
+      await Future.delayed(const Duration(seconds: 5));
     }
+    print("Wallet synced.");
 
-    if (relativeOffsets == null || relativeOffsets.isEmpty) {
-      throw Exception("No key offsets found in transaction inputs.");
-    }
-
-    // Perform the get_outs call to retrieve heights (ages) of these outputs.
-    final daemonRpc = DaemonRpc(
-      "$node/json_rpc",
-      username: daemonUsername ?? "",
-      password: daemonPassword ?? "",
+    // TODO: Loop this.
+    print("Churning once.");
+    await churnOnce(
+      wallet: wallet,
+      daemonAddress: node,
+      daemonUsername: daemonUsername,
+      daemonPassword: daemonPassword,
+      verbose: verbose,
     );
-
-    final getOutsResult =
-        await daemonRpc.getOuts(convertRelativeToAbsolute(relativeOffsets));
-
-    if (getOutsResult.outs.isEmpty) {
-      throw Exception("No outs returned from get_outs call.");
-    }
-
-    // Identify our output from the get_outs results and remove it.
-    final originalLength = getOutsResult.outs.length;
-    getOutsResult.outs.removeWhere(
-      (o) => o.txid == outputToChurn.hash && o.height == outputToChurn.height,
-    );
-    final removedCount = originalLength - getOutsResult.outs.length;
-    if (verbose) {
-      if (removedCount > 0) {
-        print("Identified our real output among the decoys and removed it.");
-      } else {
-        throw Exception("Our real output was not found among the decoys.");
-      }
-    }
-
-    // Randomize decoy order.
-    getOutsResult.outs.shuffle();
-    final randomDecoy = getOutsResult.outs.first;
-    print("Random decoy output height: ${randomDecoy.height}");
-    print("Random decoy output TxID: ${randomDecoy.txid}");
-
-    // Compare ages of real and decoy outputs.
-    if (randomDecoy.height >= outputToChurn.height) {
-      print("Conditions met. Broadcasting transaction...");
-      await wallet.commitTx(pending);
-      print("Transaction broadcasted.");
-    }
   } on FormatException catch (e) {
     // Print usage information if an invalid argument was provided.
     print(e.message);
@@ -277,6 +209,114 @@ Future<void> main(List<String> arguments) async {
   } catch (e, st) {
     print("Error occurred: $e");
     print(st);
+  }
+}
+
+/// Performs one cycle of the churning process:
+/// 1. Select an output to churn.
+/// 2. Create a transaction (not broadcasted).
+/// 3. Deserialize and inspect decoy offsets.
+/// 4. Use daemon RPC to retrieve out info and remove the real output from the list.
+/// 5. If conditions are met, commit (broadcast) the transaction.
+Future<void> churnOnce({
+  required MoneroWallet wallet,
+  required String daemonAddress,
+  String? daemonUsername,
+  String? daemonPassword,
+  bool verbose = false,
+}) async {
+  final myOutputs = await wallet.getOutputs(
+    includeSpent: false,
+    refresh: true,
+  );
+
+  if (myOutputs.isEmpty) {
+    throw Exception("No unspent outputs available.");
+  }
+
+  // Pick an output at random for churning.
+  myOutputs.shuffle();
+  final outputToChurn = myOutputs.first;
+  if (verbose) {
+    print("Using output with hash: ${outputToChurn.hash}, "
+        "height: ${outputToChurn.height}, amount: ${outputToChurn.value}");
+  }
+
+  final accountIndex = 0; // Could be configurable
+  final pending = await wallet.createTx(
+    output: Recipient(
+      address: wallet
+          .getAddress(
+            accountIndex: accountIndex,
+          )
+          .value,
+      amount: outputToChurn.value,
+    ),
+    priority: TransactionPriority.normal,
+    accountIndex: accountIndex,
+    preferredInputs: [outputToChurn],
+    sweep: true,
+  );
+  final deserializedTx = DeserializedTransaction.deserialize(pending.hex);
+
+  // Extract key offsets.
+  List<int>? relativeOffsets;
+  for (var input in deserializedTx.vin) {
+    if (input is TxinToKey) {
+      if (verbose) {
+        print("Key Image: ${_bytesToHex(input.keyImage)}");
+        print("Key Offsets: ${input.keyOffsets}");
+      }
+      relativeOffsets = input.keyOffsets.map((e) => e.toInt()).toList();
+      break; // Select first input for demonstration purposes.
+      // TODO: determine if the above is unacceptable.
+    }
+  }
+  if (relativeOffsets == null || relativeOffsets.isEmpty) {
+    throw Exception("No key offsets found in transaction inputs.");
+  }
+
+  final daemonRpc = DaemonRpc(
+    "$daemonAddress/json_rpc",
+    username: daemonUsername ?? "",
+    password: daemonPassword ?? "",
+  );
+  final getOutsResult =
+      await daemonRpc.getOuts(convertRelativeToAbsolute(relativeOffsets));
+  if (getOutsResult.outs.isEmpty) {
+    throw Exception("No outs returned from get_outs call.");
+  }
+
+  // Identify and remove our real output from the complete list of inputs,
+  // leaving just decoy inputs.
+  final originalLength = getOutsResult.outs.length;
+  getOutsResult.outs.removeWhere(
+    (o) => o.txid == outputToChurn.hash && o.height == outputToChurn.height,
+  );
+  final removedCount = originalLength - getOutsResult.outs.length;
+  if (verbose) {
+    if (removedCount > 0) {
+      print("Identified our real output among the decoys and removed it.");
+    } else {
+      throw Exception("Our real output was not found among the decoys.");
+    }
+  }
+
+  // Select a random decoy.
+  getOutsResult.outs.shuffle();
+  final randomDecoy = getOutsResult.outs.first;
+  if (verbose) {
+    print("Random decoy output height: ${randomDecoy.height}");
+    print("Random decoy output TxID: ${randomDecoy.txid}");
+  }
+
+  // Compare ages.
+  if (randomDecoy.height >= outputToChurn.height) {
+    print("Conditions met. Broadcasting transaction...");
+    await wallet.commitTx(pending);
+    print("Transaction broadcasted.");
+  } else {
+    print("Conditions not met. Not broadcasting this transaction.");
   }
 }
 
