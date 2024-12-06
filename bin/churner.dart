@@ -170,7 +170,21 @@ Future<void> main(List<String> arguments) async {
 
     final walletExists = MoneroWallet.isWalletExist(walletConfig.path);
     if (!walletExists) {
-      throw Exception("Wallet not found: ${walletConfig.path}");
+      if (verbose) {
+        print("Wallet not found: ${walletConfig.path}");
+      }
+
+      // Create the wallet.
+      try {
+        MoneroWallet.create(
+            path: walletConfig.path,
+            password: walletConfig.pass,
+            seedType: MoneroSeedType.sixteen,
+            networkType: network);
+      } catch (e, s) {
+        throw Exception("Error creating wallet: $e\n$s");
+      }
+      print("Wallet created successfully.");
     }
 
     final wallet = MoneroWallet.loadWallet(
@@ -178,6 +192,20 @@ Future<void> main(List<String> arguments) async {
       password: walletConfig.pass,
       networkType: network,
     );
+    print("Wallet Loaded");
+
+    if (!walletExists) {
+      // Show the seed to the user for backup.
+      final seed = wallet.getSeed();
+      print("The wallet seed needs to be backed up!  Press ENTER to view it.");
+      stdin.readLineSync();
+      print("Wallet seed: $seed");
+      print(
+          "Press ENTER to continue.  The screen will be cleared in order to hide the seed for privacy.");
+      stdin.readLineSync();
+      // Clear the console.
+      print("\x1B[2J\x1B[0;0H");
+    }
 
     wallet.connect(
       daemonAddress: nodeConfig.uri,
@@ -255,7 +283,8 @@ Future<void> churnOnce({
         .getAddress()
         .value); // TODO: If account is made configurable elsewhere we should respect that here, too.
 
-    throw Exception("No unspent outputs available.");
+    // Delay for a bit before checking again.
+    await Future.delayed(const Duration(seconds: 30));
   }
 
   // rng
