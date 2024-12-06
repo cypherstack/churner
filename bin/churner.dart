@@ -168,7 +168,6 @@ Future<void> main(List<String> arguments) async {
       print("[VERBOSE] All arguments: ${results.arguments}");
     }
 
-    final MoneroWallet wallet;
     final walletExists = MoneroWallet.isWalletExist(walletConfig.path);
     if (!walletExists) {
       if (verbose) {
@@ -177,7 +176,7 @@ Future<void> main(List<String> arguments) async {
 
       // Create the wallet.
       try {
-        wallet = await MoneroWallet.create(
+        await MoneroWallet.create(
             path: walletConfig.path,
             password: walletConfig.pass,
             seedType: MoneroSeedType.sixteen,
@@ -186,13 +185,16 @@ Future<void> main(List<String> arguments) async {
         throw Exception("Error creating wallet: $e\n$s");
       }
       print("Wallet created successfully.");
-    } else {
-      wallet = MoneroWallet.loadWallet(
-        path: walletConfig.path,
-        password: walletConfig.pass,
-        networkType: network,
-      );
-      print("Wallet Loaded");
+    }
+    final MoneroWallet wallet = MoneroWallet.loadWallet(
+      path: walletConfig.path,
+      password: walletConfig.pass,
+      networkType: network,
+    );
+    print("Wallet Loaded");
+
+    if (wallet == null) {
+      throw Exception("Failed to create or load wallet.");
     }
 
     if (!walletExists) {
