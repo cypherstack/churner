@@ -188,8 +188,10 @@ Future<void> main(List<String> arguments) async {
       includeSpent: false,
       refresh: true,
     );
-
-    // TODO pick an output properly
+    if (myOutputs.isEmpty) {
+      throw Exception("No unspent outputs available.");
+    }
+    myOutputs.shuffle();
     final outputToChurn = myOutputs.first;
 
     final accountIndex = 0; // TODO make this an arg?
@@ -241,17 +243,32 @@ Future<void> main(List<String> arguments) async {
       throw Exception("No outs returned from get_outs call.");
     }
 
-    final firstOut = getOutsResult.outs.first;
-    print("First decoy output height: ${firstOut.height}");
-    print("First decoy output TxID: ${firstOut.txid}");
+    // Identify our output from the get_outs results and remove it.
+    final originalLength = getOutsResult.outs.length;
+    getOutsResult.outs.removeWhere(
+      (o) => o.txid == outputToChurn.hash && o.height == outputToChurn.height,
+    );
+    final removedCount = originalLength - getOutsResult.outs.length;
+    if (verbose) {
+      if (removedCount > 0) {
+        print("Identified our real output among the decoys and removed it.");
+      } else {
+        throw Exception("Our real output was not found among the decoys.");
+      }
+    }
 
-    // Compare decoy input age with real input age for demonstration.
-    // In a real scenario, you"d retrieve the height of the outputToChurn and compare.
-    // Here, we just assume conditions are met and proceed to broadcast.
+    // Randomize decoy order.
+    getOutsResult.outs.shuffle();
+    final randomDecoy = getOutsResult.outs.first;
+    print("Random decoy output height: ${randomDecoy.height}");
+    print("Random decoy output TxID: ${randomDecoy.txid}");
 
-    print("Conditions met. Broadcasting transaction...");
-    await wallet.commitTx(pending);
-    print("Transaction broadcasted successfully.");
+    // Compare ages of real and decoy outputs.
+    if (randomDecoy.height >= outputToChurn.height) {
+      print("Conditions met. Broadcasting transaction...");
+      await wallet.commitTx(pending);
+      print("Transaction broadcasted.");
+    }
   } on FormatException catch (e) {
     // Print usage information if an invalid argument was provided.
     print(e.message);
