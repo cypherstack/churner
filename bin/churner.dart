@@ -169,7 +169,7 @@ Future<void> main(List<String> arguments) async {
 
     final walletExists = MoneroWallet.isWalletExist(walletConfig.path);
     if (!walletExists) {
-      throw Exception("Wallet not found: $walletConfig.path");
+      throw Exception("Wallet not found: ${walletConfig.path}");
     }
 
     final wallet = MoneroWallet.loadWallet(
@@ -211,12 +211,12 @@ Future<void> main(List<String> arguments) async {
     while (true) {
       try {
         await churnOnce(
-            wallet: wallet,
-            daemonAddress: nodeConfig.uri,
-            daemonUsername: nodeConfig.user,
-            daemonPassword: nodeConfig.pass,
-            verbose: verbose,
-            waitToCommit: true);
+          wallet: wallet,
+          daemonAddress: nodeConfig.uri,
+          daemonUsername: nodeConfig.user,
+          daemonPassword: nodeConfig.pass,
+          verbose: verbose,
+        );
       } catch (e, s) {
         print("Error while churning: $e\n$s");
       }
@@ -235,21 +235,16 @@ Future<void> main(List<String> arguments) async {
 /// Performs one cycle of the churning process:
 /// 1. Select an output to churn.
 /// 2. Create a transaction (not broadcasted).
-/// 3. Deserialize and inspect decoy offsets.
-/// 4. Use daemon RPC to retrieve out info and remove the real output from the list.
-/// 5. If conditions are met, commit (broadcast) the transaction.
-///
-/// If [waitToCommit] is set to true, we will wait until the decoy output is as
-/// old or older than the real output before committing.  If set to false
-/// (default), if the transaction isn't eligible for churning, we'll just skip
-/// it and move on to the next one.
+/// 3. Deserialize and inspect inputs via key offsets.
+/// 4. Use RPC to retrieve output info and remove the real input from the list.
+/// 5. Check churn conditions and broadcast when appropriate..
 Future<void> churnOnce({
   required MoneroWallet wallet,
   required String daemonAddress,
   String? daemonUsername,
   String? daemonPassword,
   bool verbose = false,
-  bool waitToCommit = false,
+  bool waitToCommit = true,
 }) async {
   final myOutputs = await wallet.getOutputs(
     includeSpent: false,
@@ -338,22 +333,99 @@ Future<void> churnOnce({
     print("Random decoy output TxID: ${randomDecoy.txid}");
   }
 
-  // Compare ages.
-  if (randomDecoy.height >= outputToChurn.height) {
-    print("Conditions met. Broadcasting transaction...");
+  // Check conditions and possibly wait before committing.
+  await checkChurnConditionsAndWaitIfNeeded(
+    wallet: wallet,
+    daemonRpc: daemonRpc,
+    outputToChurn: outputToChurn,
+    decoyHeight: randomDecoy.height,
+    pending: pending,
+    waitToCommit: waitToCommit,
+    verbose: verbose,
+  );
+}
+
+/// Check churn conditions as per the specification:
+///
+/// If Age(Y) > Age(X), X is churnable: broadcast the transaction immediately.
+///
+/// If Age(Y) <= Age(X), X is not churnable:
+///   - If `waitToCommit` is true: do not broadcast nor wait, just discard.
+///   - Otherwise (if `waitToCommit` is false): wait until Age(X) reaches the
+///     previously observed Age(Y) before broadcasting.
+///
+/// This function queries the current height to calculate Age(X) and Age(Y).
+Future<void> checkChurnConditionsAndWaitIfNeeded({
+  required MoneroWallet wallet,
+  required DaemonRpc daemonRpc,
+  required Output outputToChurn,
+  required int decoyHeight,
+  required PendingTransaction pending,
+  required bool waitToCommit,
+  bool verbose = false,
+}) async {
+  final currentHeight = await getCurrentHeight(daemonRpc);
+  final ageX = currentHeight - outputToChurn.height;
+  final ageY = currentHeight - decoyHeight;
+
+  if (verbose) {
+    print("Age(X): $ageX, Age(Y): $ageY");
+  }
+
+  if (ageY > ageX) {
+    // X is churnable, broadcast immediately.
+    if (verbose) {
+      print("X is churnable.  Broadcasting transaction immediately.");
+    }
     await wallet.commitTx(pending);
     print("Transaction broadcasted.");
   } else {
-    print("Conditions not met. Not broadcasting this transaction.");
+    // X is not churnable.
     if (waitToCommit) {
-      print("Waiting for decoy output to age...");
-      // TODO.
-      print("Decoy output is now as old or older than the real output.");
-      print("Broadcasting transaction...");
+      // If waitToCommit is true, we discard the transaction now (no waiting, no broadcasting).
+      if (verbose) {
+        print(
+            "X is not churnable and waitToCommit is true.  Discarding transaction.");
+      }
+      return; // Do not broadcast or wait.
+    } else {
+      // If waitToCommit is false, wait until Age(X) matches the observed Age(Y).
+      if (verbose) {
+        print(
+            "X is not churnable.  Waiting until Age(X) reaches previously observed Age(Y)=$ageY before broadcasting.");
+      }
+
+      final targetAgeY = ageY;
+      while (true) {
+        final newHeight = await getCurrentHeight(daemonRpc);
+        final newAgeX = newHeight - outputToChurn.height;
+        if (verbose) {
+          print(
+              "Current block height: $newHeight. Age(X): $newAgeX, waiting for Age(X) >= $targetAgeY");
+        }
+        if (newAgeX >= targetAgeY) {
+          break; // Conditions met: broadcast.
+        }
+        await Future.delayed(const Duration(seconds: 10));
+      }
+
+      if (verbose) {
+        print(
+            "Conditions met (Age(X) caught up to Age(Y)). Broadcasting transaction...");
+      }
       await wallet.commitTx(pending);
       print("Transaction broadcasted.");
     }
   }
+}
+
+/// Query the daemon for the current blockchain height.
+Future<int> getCurrentHeight(DaemonRpc daemonRpc) async {
+  final info = await daemonRpc.postToEndpoint("/get_info", {});
+  if (!info.containsKey("height")) {
+    throw Exception("Height not found in get_info response.");
+  }
+  return info["height"];
 }
 
 String get _libName {
@@ -370,4 +442,15 @@ String get _libName {
 
 String _bytesToHex(List<int> bytes) {
   return bytes.map((b) => b.toRadixString(16).padLeft(2, "0")).join();
+}
+
+/// Converts a list of relative key offsets to a list of absolute offsets.
+List<int> convertRelativeToAbsolute(List<int> relativeOffsets) {
+  List<int> absoluteOffsets = [];
+  int sum = 0;
+  for (final offset in relativeOffsets) {
+    sum += offset;
+    absoluteOffsets.add(sum);
+  }
+  return absoluteOffsets;
 }
