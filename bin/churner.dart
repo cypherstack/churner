@@ -16,25 +16,58 @@ import 'package:monero_rpc/monero_rpc.dart';
 
 const String version = "0.0.1";
 
-ArgParser buildParser() {
+ArgParser buildCreateParser() {
   return ArgParser()
-    ..addFlag(
-      "help",
-      abbr: "h",
-      negatable: false,
-      help: "Print this usage information.",
+    ..addOption(
+      "wallet",
+      abbr: "w",
+      help: "Path to the Monero wallet file.",
+      mandatory: true,
+    )
+    ..addOption(
+      "wallet-pass",
+      abbr: "p",
+      help: "Password for the Monero wallet file.",
+      mandatory: true,
+    )
+    ..addOption(
+      "node",
+      abbr: "u",
+      help: "The Monero node URL to connect to.",
+      mandatory: true,
+    )
+    ..addOption(
+      "node-user",
+      help: "Optional username for daemon digest authentication.",
+      defaultsTo: null,
+    )
+    ..addOption(
+      "node-pass",
+      help: "Optional password for daemon digest authentication.",
+      defaultsTo: null,
+    )
+    ..addOption(
+      "network",
+      abbr: "n",
+      help: "Monero network",
+      allowed: ["0", "1", "2"],
+      allowedHelp: {"0": "mainnet", "1": "testnet", "2": "stagenet"},
+      defaultsTo: "0",
     )
     ..addFlag(
-      "verbose",
-      abbr: "v",
-      negatable: false,
-      help: "Show additional command output.",
+      "ssl",
+      help: "Use SSL when connecting to the node.",
+      defaultsTo: true,
     )
     ..addFlag(
-      "version",
-      negatable: false,
-      help: "Print the tool version.",
-    )
+      "trusted",
+      help: "Whether the node is considered trusted.",
+      defaultsTo: true,
+    );
+}
+
+ArgParser buildLoadParser() {
+  return ArgParser()
     ..addOption(
       "wallet",
       abbr: "w",
@@ -84,7 +117,7 @@ ArgParser buildParser() {
 }
 
 void printUsage(ArgParser argParser) {
-  print("Usage: dart churner.dart <flags> [arguments]");
+  print("Usage: dart churner.dart <command> <flags> [arguments]");
   print(argParser.usage);
 }
 
@@ -111,45 +144,51 @@ class NodeConfig {
   });
 }
 
-Future<void> main(List<String> arguments) async {
-  final ArgParser argParser = buildParser();
+Future<void> main(List<String> args) async {
+  final mainParser = ArgParser(allowTrailingOptions: false)
+    ..addFlag(
+      "help",
+      abbr: "h",
+      negatable: false,
+      help: "Print this usage information.",
+    )
+    ..addFlag(
+      "verbose",
+      abbr: "v",
+      negatable: false,
+      help: "Show additional command output.",
+    )
+    ..addFlag(
+      "version",
+      negatable: false,
+      help: "Print the tool version.",
+    )
+    ..addCommand(
+      "load",
+      buildLoadParser(),
+    )
+    ..addCommand(
+      "new",
+      buildCreateParser(),
+    );
   bool verbose = false;
   try {
-    final ArgResults results = argParser.parse(arguments);
-
+    final parsedArgs = mainParser.parse(args);
     // Process the parsed arguments.
-    if (results.wasParsed("help")) {
-      printUsage(argParser);
+    if (parsedArgs.wasParsed("help")) {
+      print(mainParser.usage);
+      print("");
+      print("Command-specific usage:");
+      print("\nload:\n${buildLoadParser().usage}");
+      print("\nnew:\n${buildCreateParser().usage}");
       return;
     }
-    if (results.wasParsed("version")) {
+    if (parsedArgs.wasParsed("version")) {
       print("churner version: $version");
       return;
     }
-    if (results.wasParsed("verbose")) {
+    if (parsedArgs.wasParsed("verbose")) {
       verbose = true;
-    }
-
-    // Extract arguments
-    final walletConfig = WalletConfig(
-      path: results["wallet"],
-      pass: results["wallet-pass"],
-    );
-    final nodeConfig = NodeConfig(
-      uri: results["node"],
-      user: results["node-user"],
-      pass: results["node-pass"],
-      ssl: results["ssl"],
-      trusted: results["trusted"],
-    );
-
-    final network = int.parse(results["network"]);
-
-    if (verbose) {
-      print("[VERBOSE] Configuration:");
-      for (final opt in results.options) {
-        print("   $opt: ${results[opt]}");
-      }
     }
 
     // set path of .so lib
@@ -163,49 +202,30 @@ Future<void> main(List<String> arguments) async {
       thisDirPath + Platform.pathSeparator + _libName,
     );
 
-    if (verbose) {
-      print("Positional arguments: ${results.rest}");
-      print("[VERBOSE] All arguments: ${results.arguments}");
+    final MoneroWallet wallet;
+
+    switch (parsedArgs.command?.name) {
+      case "load":
+        wallet = await _load(parsedArgs.command!);
+        break;
+
+      case "new":
+        wallet = await _new(parsedArgs.command!);
+        break;
+
+      default:
+        print("Unknown command: ${parsedArgs.command?.name}");
+        print(mainParser.usage);
+        return;
     }
 
-    final walletExists = MoneroWallet.isWalletExist(walletConfig.path);
-    if (!walletExists) {
-      if (verbose) {
-        print("Wallet not found: ${walletConfig.path}");
-      }
-
-      // Create the wallet.
-      try {
-        MoneroWallet.create(
-            path: walletConfig.path,
-            password: walletConfig.pass,
-            seedType: MoneroSeedType.sixteen,
-            networkType: network);
-      } catch (e, s) {
-        throw Exception("Error creating wallet: $e\n$s");
-      }
-      print("Wallet created successfully.");
-    }
-
-    final wallet = MoneroWallet.loadWallet(
-      path: walletConfig.path,
-      password: walletConfig.pass,
-      networkType: network,
+    final nodeConfig = NodeConfig(
+      uri: parsedArgs.command!["node"],
+      user: parsedArgs.command!["node-user"],
+      pass: parsedArgs.command!["node-pass"],
+      ssl: parsedArgs.command!["ssl"],
+      trusted: parsedArgs.command!["trusted"],
     );
-    print("Wallet Loaded");
-
-    if (!walletExists) {
-      // Show the seed to the user for backup.
-      final seed = wallet.getSeed();
-      print("The wallet seed needs to be backed up!  Press ENTER to view it.");
-      stdin.readLineSync();
-      print("Wallet seed: $seed");
-      print(
-          "Press ENTER to continue.  The screen will be cleared in order to hide the seed for privacy.");
-      stdin.readLineSync();
-      // Clear the console.
-      print("\x1B[2J\x1B[0;0H");
-    }
 
     wallet.connect(
       daemonAddress: nodeConfig.uri,
@@ -251,11 +271,101 @@ Future<void> main(List<String> arguments) async {
     // Print usage information if an invalid argument was provided.
     print(e.message);
     print("");
-    printUsage(buildParser());
+    printUsage(mainParser);
   } catch (e, st) {
     print("Error occurred: $e");
     print(st);
   }
+}
+
+Future<MoneroWallet> _load(ArgResults args) async {
+  // Extract arguments
+  final walletConfig = WalletConfig(
+    path: args["wallet"],
+    pass: args["wallet-pass"],
+  );
+
+  final network = int.parse(args["network"]);
+
+  // if (verbose) {
+  //   print("[VERBOSE] Configuration:");
+  //   for (final opt in results.options) {
+  //     print("   $opt: ${results[opt]}");
+  //   }
+  // }
+  //
+  // if (verbose) {
+  //   print("Positional arguments: ${results.rest}");
+  //   print("[VERBOSE] All arguments: ${results.arguments}");
+  // }
+
+  final walletExists = MoneroWallet.isWalletExist(walletConfig.path);
+  if (!walletExists) {
+    throw Exception("Wallet not found");
+  }
+
+  final wallet = MoneroWallet.loadWallet(
+    path: walletConfig.path,
+    password: walletConfig.pass,
+    networkType: network,
+  );
+  print("Wallet Loaded");
+
+  return wallet;
+}
+
+Future<MoneroWallet> _new(ArgResults args) async {
+  // Extract arguments
+  final walletConfig = WalletConfig(
+    path: args["wallet"],
+    pass: args["wallet-pass"],
+  );
+
+  final network = int.parse(args["network"]);
+
+  // if (verbose) {
+  //   print("[VERBOSE] Configuration:");
+  //   for (final opt in results.options) {
+  //     print("   $opt: ${results[opt]}");
+  //   }
+  // }
+
+  // if (verbose) {
+  //   print("Positional arguments: ${results.rest}");
+  //   print("[VERBOSE] All arguments: ${results.arguments}");
+  // }
+
+  final walletExists = MoneroWallet.isWalletExist(walletConfig.path);
+  if (walletExists) {
+    throw Exception("Wallet already exists");
+  }
+
+  // Create the wallet.
+  final MoneroWallet wallet;
+  try {
+    wallet = await MoneroWallet.create(
+        path: walletConfig.path,
+        password: walletConfig.pass,
+        seedType: MoneroSeedType.sixteen,
+        networkType: network);
+  } catch (e, s) {
+    throw Exception("Error creating wallet: $e\n$s");
+  }
+  print("Wallet created successfully.");
+
+  // Show the seed to the user for backup.
+  final seed = wallet.getSeed();
+  print("The wallet seed needs to be backed up!  Press ENTER to view it.");
+  stdin.readLineSync();
+  print("Wallet seed: $seed");
+  print(
+    "Press ENTER to continue.  The screen will be cleared in order to hide the seed for privacy.",
+  );
+  stdin.readLineSync();
+  // Clear the console.
+  print("\x1B[2J\x1B[0;0H");
+
+  return wallet;
 }
 
 /// Performs one cycle of the churning process:
