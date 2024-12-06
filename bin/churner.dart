@@ -4,7 +4,7 @@
 // 1. Create but do not broadcast a transaction spending one output/key image.
 // 2. Get the block height associated with one of the decoy inputs.
 // 3. Broadcast tx when the decoy input is as old or older than the real input.
-// 4. Repeat.
+// 4. Repeat until churnRounds is reached (if specified).
 
 import 'dart:io';
 import 'dart:math';
@@ -81,7 +81,13 @@ ArgParser buildParser() {
       "trusted",
       help: "Whether the node is considered trusted.",
       defaultsTo: true,
-    );
+    )
+    ..addOption(
+      "rounds",
+      abbr: "r",
+      help: "The number of rounds of churn to perform.  0 for infinite.",
+      defaultsTo: "0",
+    )
 }
 
 void printUsage(ArgParser argParser) {
@@ -145,6 +151,7 @@ Future<void> main(List<String> arguments) async {
     );
 
     final network = int.parse(results["network"]);
+    final churnRounds = int.parse(results["rounds"]);
 
     if (verbose) {
       print("[VERBOSE] Configuration:");
@@ -238,19 +245,29 @@ Future<void> main(List<String> arguments) async {
     }
     print("Wallet synced.");
 
-    while (true) {
+    int churnCount = 0;
+    // If churnRounds == 0, we churn indefinitely.
+    while (churnRounds == 0 || churnCount < churnRounds) {
       try {
-        await churnOnce(
+        final churned = await churnOnce(
           wallet: wallet,
           daemonAddress: nodeConfig.uri,
           daemonUsername: nodeConfig.user,
           daemonPassword: nodeConfig.pass,
           verbose: verbose,
         );
+        if (churned) {
+          churnCount++;
+          if (verbose && churnRounds > 0) {
+            print("Churned $churnCount/$churnRounds times.");
+          }
+        }
       } catch (e, s) {
         print("Error while churning: $e\n$s");
       }
     }
+
+    print("Completed $churnCount churn round(s). Exiting.");
   } on FormatException catch (e) {
     // Print usage information if an invalid argument was provided.
     print(e.message);
@@ -267,8 +284,12 @@ Future<void> main(List<String> arguments) async {
 /// 2. Create a transaction (not broadcasted).
 /// 3. Deserialize and inspect inputs via key offsets.
 /// 4. Use RPC to retrieve output info and remove the real input from the list.
-/// 5. Check churn conditions and broadcast when appropriate..
-Future<void> churnOnce({
+/// 5. Check churn conditions and broadcast when appropriate.
+///
+/// Returns true if a churn was completed (i.e., a transaction was broadcasted).
+/// Returns false if no churn was performed (e.g. no outputs available or the
+/// transaction was discarded).
+Future<bool> churnOnce({
   required MoneroWallet wallet,
   required String daemonAddress,
   String? daemonUsername,
@@ -292,7 +313,7 @@ Future<void> churnOnce({
 
     // Delay for a bit before checking again.
     await Future.delayed(const Duration(seconds: 30));
-    return;
+    return false;
   }
 
   // rng
@@ -378,7 +399,7 @@ Future<void> churnOnce({
   }
 
   // Check conditions and possibly wait before committing.
-  await checkChurnConditionsAndWaitIfNeeded(
+  final churnCompleted = await checkChurnConditionsAndWaitIfNeeded(
     wallet: wallet,
     daemonRpc: daemonRpc,
     outputToChurn: outputToChurn,
@@ -387,6 +408,8 @@ Future<void> churnOnce({
     waitToCommit: waitToCommit,
     verbose: verbose,
   );
+
+  return churnCompleted;
 }
 
 /// Check churn conditions as per the specification:
@@ -398,8 +421,8 @@ Future<void> churnOnce({
 ///   - Otherwise (if `waitToCommit` is false): wait until Age(X) reaches the
 ///     previously observed Age(Y) before broadcasting.
 ///
-/// This function queries the current height to calculate Age(X) and Age(Y).
-Future<void> checkChurnConditionsAndWaitIfNeeded({
+/// Returns true if a transaction was broadcasted, false otherwise.
+Future<bool> checkChurnConditionsAndWaitIfNeeded({
   required MoneroWallet wallet,
   required DaemonRpc daemonRpc,
   required Output outputToChurn,
@@ -423,15 +446,16 @@ Future<void> checkChurnConditionsAndWaitIfNeeded({
     }
     await wallet.commitTx(pending);
     print("Transaction broadcasted.");
+    return true;
   } else {
     // X is not churnable.
     if (waitToCommit) {
-      // If waitToCommit is true, we discard the transaction now (no waiting, no broadcasting).
+      // If waitToCommit is true, discard the transaction now.
       if (verbose) {
         print(
             "X is not churnable and waitToCommit is true.  Discarding transaction.");
       }
-      return; // Do not broadcast or wait.
+      return false;
     } else {
       // If waitToCommit is false, wait until Age(X) matches the observed Age(Y).
       if (verbose) {
@@ -459,6 +483,7 @@ Future<void> checkChurnConditionsAndWaitIfNeeded({
       }
       await wallet.commitTx(pending);
       print("Transaction broadcasted.");
+      return true;
     }
   }
 }

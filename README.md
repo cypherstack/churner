@@ -34,14 +34,15 @@ dart churner.dart <flags> [arguments]
 - `-u, --node`: URL of the Monero node to connect to
 
 ### Optional Parameters
-- `-n, --network`: Monero network (0=mainnet, 1=testnet, 2=stagenet, default: 0)
-- `--node-user`: Username for node authentication
-- `--node-pass`: Password for node authentication
-- `--ssl`: Use SSL for node connection (default: true)
-- `--trusted`: Whether the node is trusted (default: true)
-- `-v, --verbose`: Show additional command output
-- `-h, --help`: Display usage information
-- `--version`: Display version information
+- `-r, --rounds`: Number of churn rounds to perform (default: 0 for infinite).
+- `-n, --network`: Monero network: 0=mainnet (default), 1=testnet, 2=stagenet.
+- `--node-user`: Username for node authentication.
+- `--node-pass`: Password for node authentication.
+- `--ssl`: Use SSL for node connection (default: true).
+- `--trusted`: Whether the node is trusted (default: true).
+- `-v, --verbose`: Show additional command output.
+- `-h, --help`: Display usage information.
+- `--version`: Display version information.
 
 ### Example
 ```bash
