@@ -7,6 +7,7 @@
 // 4. Repeat.
 
 import 'dart:io';
+import 'dart:math';
 
 import 'package:args/args.dart';
 import 'package:cs_monero/cs_monero.dart';
@@ -194,9 +195,6 @@ Future<void> main(List<String> arguments) async {
 
     wallet.startSyncing();
 
-    // TODO add listeners??
-    wallet.startListeners();
-
     wallet.startAutoSaving();
 
     // Wait for syncing to complete.
@@ -254,10 +252,13 @@ Future<void> churnOnce({
     throw Exception("No unspent outputs available.");
   }
 
+  // rng
+  final random = Random.secure();
+
   // Pick an output at random for churning.
   //
   // In the future we could select a specific output based on some criteria.
-  myOutputs.shuffle();
+  myOutputs.shuffle(random);
   final outputToChurn = myOutputs.first;
   if (verbose) {
     print("Using output with hash: ${outputToChurn.hash}, "
@@ -326,7 +327,7 @@ Future<void> churnOnce({
   }
 
   // Select a random decoy.
-  getOutsResult.outs.shuffle();
+  getOutsResult.outs.shuffle(random);
   final randomDecoy = getOutsResult.outs.first;
   if (verbose) {
     print("Random decoy output height: ${randomDecoy.height}");
