@@ -139,19 +139,19 @@ Future<void> main(List<String> arguments) async {
 
     // Extract arguments
     final walletConfig = WalletConfig(
-      path: results["wallet"],
-      pass: results["wallet-pass"],
+      path: results["wallet"] as String,
+      pass: results["wallet-pass"] as String,
     );
     final nodeConfig = NodeConfig(
-      uri: results["node"],
-      user: results["node-user"],
-      pass: results["node-pass"],
-      ssl: results["ssl"],
-      trusted: results["trusted"],
+      uri: results["node"] as String,
+      user: results["node-user"] as String?,
+      pass: results["node-pass"] as String?,
+      ssl: results["ssl"] as bool,
+      trusted: results["trusted"] as bool,
     );
 
-    final network = int.parse(results["network"]);
-    final churnRounds = int.parse(results["rounds"]);
+    final network = int.parse(results["network"] as String);
+    final churnRounds = int.parse(results["rounds"] as String);
 
     if (verbose) {
       l("[VERBOSE] Configuration settings being applied:");
@@ -160,7 +160,7 @@ Future<void> main(List<String> arguments) async {
       l("   Network type: ${results["network"]} (${{
         "0": "mainnet",
         "1": "testnet",
-        "2": "stagenet"
+        "2": "stagenet",
       }[results["network"]]})");
       l("   Using SSL: ${results["ssl"]}");
       l("   Node trusted: ${results["trusted"]}");
@@ -252,7 +252,7 @@ Future<void> main(List<String> arguments) async {
       if (verbose) {
         l("Wallet syncing...");
       }
-      await Future.delayed(const Duration(seconds: 5));
+      await Future<void>.delayed(const Duration(seconds: 5));
     }
     l("Wallet synced.");
 
@@ -276,7 +276,7 @@ Future<void> main(List<String> arguments) async {
       } catch (e, s) {
         l("Error while churning: $e\n$s");
         // Add a small delay as a hackfix for the "No unlocked balance" (non-)issue.
-        await Future.delayed(const Duration(seconds: 60));
+        await Future<void>.delayed(const Duration(seconds: 60));
       }
     }
 
@@ -324,7 +324,7 @@ Future<bool> churnOnce({
     l(AsciiQrGenerator.generate("monero:$address"));
 
     // Delay for a bit before checking again.
-    await Future.delayed(const Duration(seconds: 30));
+    await Future<void>.delayed(const Duration(seconds: 30));
     return false;
   }
   if (verbose) {
@@ -379,7 +379,7 @@ Future<bool> churnOnce({
 
   // Extract key offsets.
   List<int>? relativeOffsets;
-  for (var input in deserializedTx.vin) {
+  for (final input in deserializedTx.vin) {
     if (input is TxinToKey) {
       if (verbose) {
         l("Key Image: ${_bytesToHex(input.keyImage)}");
@@ -528,7 +528,7 @@ Future<bool> checkChurnConditionsAndWaitIfNeeded({
         if (newAgeX >= targetAgeY) {
           break; // Conditions met: broadcast.
         }
-        await Future.delayed(const Duration(seconds: 10));
+        await Future<void>.delayed(const Duration(seconds: 10));
       }
 
       if (verbose) {
@@ -547,7 +547,7 @@ Future<int> getCurrentHeight(DaemonRpc daemonRpc) async {
   if (!info.containsKey("height")) {
     throw Exception("Height not found in get_info response.");
   }
-  return info["height"];
+  return info["height"] as int;
 }
 
 String get _libName {
@@ -568,7 +568,7 @@ String _bytesToHex(List<int> bytes) {
 
 /// Converts a list of relative key offsets to a list of absolute offsets.
 List<int> convertRelativeToAbsolute(List<int> relativeOffsets) {
-  List<int> absoluteOffsets = [];
+  final List<int> absoluteOffsets = [];
   int sum = 0;
   for (final offset in relativeOffsets) {
     sum += offset;
