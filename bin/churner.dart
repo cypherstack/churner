@@ -214,10 +214,6 @@ Future<void> main(List<String> arguments) async {
     );
     print("Wallet Loaded");
 
-    if (wallet == null) {
-      throw Exception("Failed to create or load wallet.");
-    }
-
     if (!walletExists) {
       // Show the seed to the user for backup.
       final seed = wallet.getSeed();
