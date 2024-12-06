@@ -154,10 +154,17 @@ Future<void> main(List<String> arguments) async {
     final churnRounds = int.parse(results["rounds"]);
 
     if (verbose) {
-      print("[VERBOSE] Configuration:");
-      for (final opt in results.options) {
-        print("   $opt: ${results[opt]}");
-      }
+      print("[VERBOSE] Configuration settings being applied:");
+      print("   Wallet path: ${results["wallet"]}");
+      print("   Node URL: ${results["node"]}");
+      print("   Network type: ${results["network"]} (${{
+        "0": "mainnet",
+        "1": "testnet",
+        "2": "stagenet"
+      }[results["network"]]})");
+      print("   Using SSL: ${results["ssl"]}");
+      print("   Node trusted: ${results["trusted"]}");
+      print("   Churn rounds: ${results["rounds"]} (0 = infinite)");
     }
 
     // set path of .so lib
@@ -321,6 +328,9 @@ Future<bool> churnOnce({
     await Future.delayed(const Duration(seconds: 30));
     return false;
   }
+  if (verbose) {
+    print("Found ${myOutputs.length} unspent outputs.");
+  }
 
   // rng
   final random = Random.secure();
@@ -331,8 +341,10 @@ Future<bool> churnOnce({
   myOutputs.shuffle(random);
   final outputToChurn = myOutputs.first;
   if (verbose) {
-    print("Using output with hash: ${outputToChurn.hash}, "
-        "height: ${outputToChurn.height}, amount: ${outputToChurn.value}");
+    print("Using output for churn operation:");
+    print("   Transaction hash: ${outputToChurn.hash}");
+    print("   Block height: ${outputToChurn.height}");
+    print("   Amount: ${outputToChurn.value} atomic units");
   }
 
   final accountIndex = 0; // Could be configurable.
@@ -350,7 +362,20 @@ Future<bool> churnOnce({
     preferredInputs: [outputToChurn],
     sweep: true,
   );
+  if (verbose) {
+    print("Transaction details:");
+    print("   Transaction hash: ${pending.txid}");
+    print("   Amount: ${pending.amount}");
+    print("   Fee: ${pending.fee}");
+  }
   final deserializedTx = DeserializedTransaction.deserialize(pending.hex);
+  if (verbose) {
+    print("Deserialized transaction:");
+    print("   Version: ${deserializedTx.version}");
+    print("   Unlock time: ${deserializedTx.unlockTime}");
+    print("   Inputs: ${deserializedTx.vin.length}");
+    print("   Outputs: ${deserializedTx.vout.length}");
+  }
 
   // Extract key offsets.
   List<int>? relativeOffsets;
@@ -368,6 +393,11 @@ Future<bool> churnOnce({
   if (relativeOffsets == null || relativeOffsets.isEmpty) {
     throw Exception("No key offsets found in transaction inputs.");
   }
+  if (verbose) {
+    print("Relative key offsets: $relativeOffsets");
+    print(
+        "Absolute key offsets: ${convertRelativeToAbsolute(relativeOffsets)}");
+  }
 
   final daemonRpc = DaemonRpc(
     "$daemonAddress/json_rpc",
@@ -378,6 +408,10 @@ Future<bool> churnOnce({
       await daemonRpc.getOuts(convertRelativeToAbsolute(relativeOffsets));
   if (getOutsResult.outs.isEmpty) {
     throw Exception("No outputs returned from get_outs call.");
+  }
+  if (verbose) {
+    print("get_outs result:");
+    print("   Outputs: ${getOutsResult.outs.length}");
   }
 
   // Remove our real input from the list, leaving just decoy inputs.
@@ -442,7 +476,25 @@ Future<bool> checkChurnConditionsAndWaitIfNeeded({
   final ageY = currentHeight - decoyHeight;
 
   if (verbose) {
-    print("Age(X): $ageX, Age(Y): $ageY");
+    print("\nAge analysis:");
+    print("   Current block height: $currentHeight");
+    print("   Real input (X) block height: ${outputToChurn.height}");
+    print("   Decoy input (Y) block height: ${decoyHeight}");
+    print("   Age of real input (X): $ageX blocks");
+    print("   Age of decoy input (Y): $ageY blocks");
+    print("\nPrivacy calculation:");
+    if (ageY > ageX) {
+      print("   Decoy is older than real input - good for privacy");
+      print("   Proceeding with immediate broadcast");
+    } else {
+      print("   Real input is older than decoy - suboptimal for privacy");
+      if (waitToCommit) {
+        print("   Waiting for real input to age sufficiently");
+        print("   Target age difference to overcome: ${ageX - ageY} blocks");
+      } else {
+        print("   Discarding transaction per waitToCommit setting");
+      }
+    }
   }
 
   if (ageY > ageX) {
