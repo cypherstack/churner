@@ -23,6 +23,14 @@ dart run tools/build.dart
 dart run bin/churner.dart --help
 ```
 
+### First Run
+When running for the first time with a new wallet path, the tool will:
+
+1. Create a new wallet.
+2. Display the seed phrase: save this securely!
+3. Begin synchronizing with the network.
+4. Start the churning process once synced.
+
 ## Usage
 ```bash
 dart churner.dart <flags> [arguments]
@@ -48,14 +56,6 @@ dart churner.dart <flags> [arguments]
 ```bash
 dart churner.dart -w /path/to/wallet -p wallet_password -u monero.stackwallet.com:18081 --verbose
 ```
-
-## First Run
-When running for the first time with a new wallet path, the tool will:
-
-1. Create a new wallet.
-2. Display the seed phrase: save this securely!
-3. Begin synchronizing with the network.
-4. Start the churning process once synced.
 
 ## Security Notes
 - Keep your wallet seed phrase secure - it's your only backup.
