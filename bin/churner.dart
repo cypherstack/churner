@@ -33,16 +33,16 @@ ArgParser buildParser() {
       help: 'Print the tool version.',
     )
     ..addOption(
-      'path',
-      help:
-          'Path to the Monero wallet file.  Defaults to empty string.', // TODO: This default should change.
-      defaultsTo: '',
+      'wallet-path',
+      abbr: 'w',
+      help: 'Path to the Monero wallet file.',
+      mandatory: true,
     )
     ..addOption(
       'pass',
-      help:
-          'Password for the Monero wallet file.  Defaults to an empty string.',
-      defaultsTo: '',
+      abbr: 'p',
+      help: 'Password for the Monero wallet file.',
+      mandatory: true,
     )
     ..addOption(
       'node',
@@ -102,7 +102,7 @@ void main(List<String> arguments) {
     }
 
     // Extract arguments
-    final pathToWallet = results['path'] as String;
+    final pathToWallet = results['wallet-path'] as String;
     final password = results['pass'] as String;
     final node = results['node'] as String;
     final daemonUsername =
@@ -115,7 +115,7 @@ void main(List<String> arguments) {
             : results['node-pass'] as String;
     final network = int.tryParse(results['network'] as String) ?? 0;
     final ssl = results['ssl'] as bool ?? true;
-    final trusted = results['trusted'] as bool ?? false;
+    final trusted = results['trusted'] as bool? ?? false;
 
     if (verbose) {
       print('[VERBOSE] Configuration:');
