@@ -1,9 +1,9 @@
-/// General churning flow:
-///
-/// 1. Sync a wallet.
-/// 2. Create but do not broadcast a transaction spending one output/key image.
-/// 3. Get the block height associated with one of the decoy inputs.
-/// 4. Broadcast tx when the decoy input is as old or older than the real input.
+// General churning flow:
+//
+// 1. Sync a wallet.
+// 2. Create but do not broadcast a transaction spending one output/key image.
+// 3. Get the block height associated with one of the decoy inputs.
+// 4. Broadcast tx when the decoy input is as old or older than the real input.
 
 import 'dart:io';
 
@@ -12,74 +12,77 @@ import 'package:cs_monero/cs_monero.dart';
 import 'package:cs_monero/src/ffi_bindings/monero_bindings_base.dart';
 import 'package:monero_rpc/monero_rpc.dart';
 
-const String version = '0.0.1';
+const String version = "0.0.1";
 
 ArgParser buildParser() {
   return ArgParser()
     ..addFlag(
-      'help',
-      abbr: 'h',
+      "help",
+      abbr: "h",
       negatable: false,
-      help: 'Print this usage information.',
+      help: "Print this usage information.",
     )
     ..addFlag(
-      'verbose',
-      abbr: 'v',
+      "verbose",
+      abbr: "v",
       negatable: false,
-      help: 'Show additional command output.',
+      help: "Show additional command output.",
     )
     ..addFlag(
-      'version',
+      "version",
       negatable: false,
-      help: 'Print the tool version.',
+      help: "Print the tool version.",
     )
     ..addOption(
-      'wallet-path',
-      abbr: 'w',
-      help: 'Path to the Monero wallet file.',
+      "wallet-path",
+      abbr: "w",
+      help: "Path to the Monero wallet file.",
       mandatory: true,
     )
     ..addOption(
-      'pass',
-      abbr: 'p',
-      help: 'Password for the Monero wallet file.',
+      "pass",
+      abbr: "p",
+      help: "Password for the Monero wallet file.",
       mandatory: true,
     )
     ..addOption(
-      'node',
-      abbr: 'u',
+      "node",
+      abbr: "u",
       help:
-          'The Monero node URL to connect to.  Defaults to monero.stackwallet.com:18081.',
-      defaultsTo: 'monero.stackwallet.com:18081',
+          "The Monero node URL to connect to.  Defaults to monero.stackwallet.com:18081.",
+      defaultsTo: "monero.stackwallet.com:18081",
     )
     ..addOption(
-      'node-user',
-      help: 'Optional username for daemon digest authentication.',
+      "node-user",
+      help: "Optional username for daemon digest authentication.",
       defaultsTo: null,
     )
     ..addOption(
-      'node-pass',
-      help: 'Optional password for daemon digest authentication.',
+      "node-pass",
+      help: "Optional password for daemon digest authentication.",
       defaultsTo: null,
     )
-    ..addOption('network',
-        help:
-            'Monero network type (0=mainnet, 1=testnet, 2=stagenet).  Defaults to 0 (mainnet).',
-        defaultsTo: '0')
+    ..addOption(
+      "network",
+      help: "Monero network",
+      allowed: ["0", "1", "2"],
+      allowedHelp: {"0": "mainnet", "1": "testnet", "2": "stagenet"},
+      defaultsTo: "0",
+    )
     ..addFlag(
-      'ssl',
-      help: 'Use SSL when connecting to the node.  Defaults to true.',
+      "ssl",
+      help: "Use SSL when connecting to the node.  Defaults to true.",
       defaultsTo: true,
     )
     ..addFlag(
-      'trusted',
-      help: 'Whether the node is considered trusted.  Defaults to false.',
+      "trusted",
+      help: "Whether the node is considered trusted.  Defaults to false.",
       defaultsTo: false,
     );
 }
 
 void printUsage(ArgParser argParser) {
-  print('Usage: dart churner.dart <flags> [arguments]');
+  print("Usage: dart churner.dart <flags> [arguments]");
   print(argParser.usage);
 }
 
@@ -90,44 +93,44 @@ Future<void> main(List<String> arguments) async {
     bool verbose = false;
 
     // Process the parsed arguments.
-    if (results.wasParsed('help')) {
+    if (results.wasParsed("help")) {
       printUsage(argParser);
       return;
     }
-    if (results.wasParsed('version')) {
-      print('churner version: $version');
+    if (results.wasParsed("version")) {
+      print("churner version: $version");
       return;
     }
-    if (results.wasParsed('verbose')) {
+    if (results.wasParsed("verbose")) {
       verbose = true;
     }
 
     // Extract arguments
-    final pathToWallet = results['wallet-path'] as String;
-    final password = results['pass'] as String;
-    final node = results['node'] as String;
+    final pathToWallet = results["wallet-path"] as String;
+    final password = results["pass"] as String;
+    final node = results["node"] as String;
     final daemonUsername =
-        results['node-user'] == null || (results['node-user'] as String).isEmpty
+        results["node-user"] == null || (results["node-user"] as String).isEmpty
             ? null
-            : results['node-user'] as String;
+            : results["node-user"] as String;
     final daemonPassword =
-        results['node-pass'] == null || (results['node-pass'] as String).isEmpty
+        results["node-pass"] == null || (results["node-pass"] as String).isEmpty
             ? null
-            : results['node-pass'] as String;
-    final network = int.tryParse(results['network'] as String) ?? 0;
-    final ssl = results['ssl'] as bool ?? true;
-    final trusted = results['trusted'] as bool? ?? false;
+            : results["node-pass"] as String;
+    final network = int.tryParse(results["network"] as String) ?? 0;
+    final ssl = results["ssl"] as bool ?? true;
+    final trusted = results["trusted"] as bool? ?? false;
 
     if (verbose) {
-      print('[VERBOSE] Configuration:');
-      print('  pathToWallet: $pathToWallet');
-      print('  password: $password');
-      print('  node: $node');
-      print('  daemonUsername: $daemonUsername');
-      print('  daemonPassword: $daemonPassword');
-      print('  network: $network');
-      print('  ssl: $ssl');
-      print('  trusted: $trusted');
+      print("[VERBOSE] Configuration:");
+      print("  pathToWallet: $pathToWallet");
+      print("  password: $password");
+      print("  node: $node");
+      print("  daemonUsername: $daemonUsername");
+      print("  daemonPassword: $daemonPassword");
+      print("  network: $network");
+      print("  ssl: $ssl");
+      print("  trusted: $trusted");
     }
 
     // set path of .so lib
@@ -142,9 +145,9 @@ Future<void> main(List<String> arguments) async {
     );
 
     // Act on the arguments provided.
-    print('Positional arguments: ${results.rest}');
+    print("Positional arguments: ${results.rest}");
     if (verbose) {
-      print('[VERBOSE] All arguments: ${results.arguments}');
+      print("[VERBOSE] All arguments: ${results.arguments}");
     }
 
     final walletExists = MoneroWallet.isWalletExist(pathToWallet);
@@ -213,8 +216,8 @@ Future<void> main(List<String> arguments) async {
     List<int>? relativeOffsets;
     for (var input in deserializedTx.vin) {
       if (input is TxinToKey) {
-        print('Key Image: ${_bytesToHex(input.keyImage)}');
-        print('Key Offsets: ${input.keyOffsets}');
+        print("Key Image: ${_bytesToHex(input.keyImage)}");
+        print("Key Offsets: ${input.keyOffsets}");
         relativeOffsets = input.keyOffsets.map((e) => e.toInt()).toList();
         break; // just take the first input for demonstration.
       }
@@ -226,9 +229,9 @@ Future<void> main(List<String> arguments) async {
 
     // Perform the get_outs call to retrieve heights (ages) of these outputs.
     final daemonRpc = DaemonRpc(
-      node + '/json_rpc',
-      username: daemonUsername ?? '',
-      password: daemonPassword ?? '',
+      "$node/json_rpc",
+      username: daemonUsername ?? "",
+      password: daemonPassword ?? "",
     );
 
     final getOutsResult =
@@ -239,11 +242,11 @@ Future<void> main(List<String> arguments) async {
     }
 
     final firstOut = getOutsResult.outs.first;
-    print('First decoy output height: ${firstOut.height}');
-    print('First decoy output TxID: ${firstOut.txid}');
+    print("First decoy output height: ${firstOut.height}");
+    print("First decoy output TxID: ${firstOut.txid}");
 
     // Compare decoy input age with real input age for demonstration.
-    // In a real scenario, you'd retrieve the height of the outputToChurn and compare.
+    // In a real scenario, you"d retrieve the height of the outputToChurn and compare.
     // Here, we just assume conditions are met and proceed to broadcast.
 
     print("Conditions met. Broadcasting transaction...");
@@ -252,7 +255,7 @@ Future<void> main(List<String> arguments) async {
   } on FormatException catch (e) {
     // Print usage information if an invalid argument was provided.
     print(e.message);
-    print('');
+    print("");
     printUsage(buildParser());
   } catch (e, st) {
     print("Error occurred: $e");
@@ -262,9 +265,9 @@ Future<void> main(List<String> arguments) async {
 
 String get _libName {
   if (Platform.isWindows) {
-    return 'monero_libwallet2_api_c.dll';
+    return "monero_libwallet2_api_c.dll";
   } else if (Platform.isLinux) {
-    return 'monero_libwallet2_api_c.so';
+    return "monero_libwallet2_api_c.so";
   } else {
     throw UnsupportedError(
       "Platform \"${Platform.operatingSystem}\" is not supported",
@@ -273,5 +276,5 @@ String get _libName {
 }
 
 String _bytesToHex(List<int> bytes) {
-  return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+  return bytes.map((b) => b.toRadixString(16).padLeft(2, "0")).join();
 }
