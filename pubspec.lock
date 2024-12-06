@@ -30,6 +30,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.6.0"
+  ascii_qr:
+    dependency: "direct main"
+    description:
+      name: ascii_qr
+      sha256: "2046e400a0fa4ea0de5df44c87b992cdd1f76403bb15e64513b89263598750ae"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.1"
   async:
     dependency: transitive
     description:
@@ -82,11 +90,19 @@ packages:
     dependency: "direct main"
     description:
       path: cs_monero
-      ref: c737891f383426f891448c16e5f945575f374237
-      resolved-ref: c737891f383426f891448c16e5f945575f374237
+      ref: "3f22b1a96a800a0f124af06638c738aed5e99e04"
+      resolved-ref: "3f22b1a96a800a0f124af06638c738aed5e99e04"
       url: "https://github.com/cypherstack/cs_monero.git"
     source: git
     version: "1.0.0-pre"
+  digest_auth:
+    dependency: transitive
+    description:
+      name: digest_auth
+      sha256: c8f4a8d65300bd58c4a2ca84ea6bd63cb584e8021e5689c600ee7efae34d73ea
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.1"
   ffi:
     dependency: transitive
     description:
@@ -119,6 +135,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.2"
+  http:
+    dependency: transitive
+    description:
+      name: http
+      sha256: b9c29a161230ee03d3ccf545097fccd9b87a5264228c5d348202e0f0c28f9010
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.2.2"
   http_multi_server:
     dependency: transitive
     description:
@@ -207,6 +231,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.0"
+  monero_rpc:
+    dependency: "direct main"
+    description:
+      name: monero_rpc
+      sha256: "6a6fee0fefdc2b4e41dde930cb7b1a042df36da1eabb83dec586b2bd3e304560"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.3.0"
   node_preamble:
     dependency: transitive
     description:
@@ -247,6 +279,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.4"
+  qr:
+    dependency: transitive
+    description:
+      name: qr
+      sha256: "5a1d2586170e172b8a8c8470bbbffd5eb0cd38a66c0d77155ea138d3af3a4445"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.0.2"
   shelf:
     dependency: transitive
     description:
