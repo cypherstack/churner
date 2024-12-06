@@ -35,13 +35,13 @@ ArgParser buildParser() {
       help: "Print the tool version.",
     )
     ..addOption(
-      "wallet-path",
+      "wallet",
       abbr: "w",
       help: "Path to the Monero wallet file.",
       mandatory: true,
     )
     ..addOption(
-      "pass",
+      "wallet-pass",
       abbr: "p",
       help: "Password for the Monero wallet file.",
       mandatory: true,
@@ -49,9 +49,8 @@ ArgParser buildParser() {
     ..addOption(
       "node",
       abbr: "u",
-      help:
-          "The Monero node URL to connect to.  Defaults to monero.stackwallet.com:18081.",
-      defaultsTo: "monero.stackwallet.com:18081",
+      help: "The Monero node URL to connect to.",
+      mandatory: true,
     )
     ..addOption(
       "node-user",
@@ -65,6 +64,7 @@ ArgParser buildParser() {
     )
     ..addOption(
       "network",
+      abbr: "n",
       help: "Monero network",
       allowed: ["0", "1", "2"],
       allowedHelp: {"0": "mainnet", "1": "testnet", "2": "stagenet"},
@@ -72,13 +72,13 @@ ArgParser buildParser() {
     )
     ..addFlag(
       "ssl",
-      help: "Use SSL when connecting to the node.  Defaults to true.",
+      help: "Use SSL when connecting to the node.",
       defaultsTo: true,
     )
     ..addFlag(
       "trusted",
-      help: "Whether the node is considered trusted.  Defaults to false.",
-      defaultsTo: false,
+      help: "Whether the node is considered trusted.",
+      defaultsTo: true,
     );
 }
 
@@ -87,11 +87,34 @@ void printUsage(ArgParser argParser) {
   print(argParser.usage);
 }
 
+class WalletConfig {
+  final String path, pass;
+
+  WalletConfig({
+    required this.path,
+    required this.pass,
+  });
+}
+
+class NodeConfig {
+  final String uri;
+  final String? user, pass;
+  final bool ssl, trusted;
+
+  NodeConfig({
+    required this.uri,
+    required this.user,
+    required this.pass,
+    required this.ssl,
+    required this.trusted,
+  });
+}
+
 Future<void> main(List<String> arguments) async {
   final ArgParser argParser = buildParser();
+  bool verbose = false;
   try {
     final ArgResults results = argParser.parse(arguments);
-    bool verbose = false;
 
     // Process the parsed arguments.
     if (results.wasParsed("help")) {
@@ -107,31 +130,25 @@ Future<void> main(List<String> arguments) async {
     }
 
     // Extract arguments
-    final pathToWallet = results["wallet-path"] as String;
-    final password = results["pass"] as String;
-    final node = results["node"] as String;
-    final daemonUsername =
-        results["node-user"] == null || (results["node-user"] as String).isEmpty
-            ? null
-            : results["node-user"] as String;
-    final daemonPassword =
-        results["node-pass"] == null || (results["node-pass"] as String).isEmpty
-            ? null
-            : results["node-pass"] as String;
-    final network = int.tryParse(results["network"] as String) ?? 0;
-    final ssl = results["ssl"] as bool;
-    final trusted = results["trusted"] as bool? ?? false;
+    final walletConfig = WalletConfig(
+      path: results["wallet"],
+      pass: results["wallet-pass"],
+    );
+    final nodeConfig = NodeConfig(
+      uri: results["node"],
+      user: results["node-user"],
+      pass: results["node-pass"],
+      ssl: results["ssl"],
+      trusted: results["trusted"],
+    );
+
+    final network = int.parse(results["network"]);
 
     if (verbose) {
       print("[VERBOSE] Configuration:");
-      print("  pathToWallet: $pathToWallet");
-      print("  password: $password");
-      print("  node: $node");
-      print("  daemonUsername: $daemonUsername");
-      print("  daemonPassword: $daemonPassword");
-      print("  network: $network");
-      print("  ssl: $ssl");
-      print("  trusted: $trusted");
+      for (final opt in results.options) {
+        print("   $opt: ${results[opt]}");
+      }
     }
 
     // set path of .so lib
@@ -145,35 +162,34 @@ Future<void> main(List<String> arguments) async {
       thisDirPath + Platform.pathSeparator + _libName,
     );
 
-    // Act on the arguments provided.
-    print("Positional arguments: ${results.rest}");
     if (verbose) {
+      print("Positional arguments: ${results.rest}");
       print("[VERBOSE] All arguments: ${results.arguments}");
     }
 
-    final walletExists = MoneroWallet.isWalletExist(pathToWallet);
+    final walletExists = MoneroWallet.isWalletExist(walletConfig.path);
     if (!walletExists) {
-      throw Exception("Wallet not found: $pathToWallet");
+      throw Exception("Wallet not found: $walletConfig.path");
     }
 
     final wallet = MoneroWallet.loadWallet(
-      path: pathToWallet,
-      password: password,
+      path: walletConfig.path,
+      password: walletConfig.pass,
       networkType: network,
     );
 
     wallet.connect(
-      daemonAddress: node,
-      trusted: trusted,
-      daemonUsername: daemonUsername,
-      daemonPassword: daemonPassword,
-      useSSL: ssl,
+      daemonAddress: nodeConfig.uri,
+      trusted: nodeConfig.trusted,
+      daemonUsername: nodeConfig.user,
+      daemonPassword: nodeConfig.pass,
+      useSSL: nodeConfig.ssl,
       socksProxyAddress: null, // needed?
     );
 
     final connected = await wallet.isConnectedToDaemon();
     if (!connected) {
-      throw Exception("Failed to connect to daemon: $node");
+      throw Exception("Failed to connect to daemon: ${nodeConfig.uri}");
     }
 
     wallet.startSyncing();
@@ -196,9 +212,9 @@ Future<void> main(List<String> arguments) async {
     print("Churning once.");
     await churnOnce(
       wallet: wallet,
-      daemonAddress: node,
-      daemonUsername: daemonUsername,
-      daemonPassword: daemonPassword,
+      daemonAddress: nodeConfig.uri,
+      daemonUsername: nodeConfig.user,
+      daemonPassword: nodeConfig.pass,
       verbose: verbose,
     );
   } on FormatException catch (e) {
@@ -208,7 +224,9 @@ Future<void> main(List<String> arguments) async {
     printUsage(buildParser());
   } catch (e, st) {
     print("Error occurred: $e");
-    print(st);
+    if (verbose) {
+      print(st);
+    }
   }
 }
 
