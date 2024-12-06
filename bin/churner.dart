@@ -87,7 +87,7 @@ ArgParser buildParser() {
       abbr: "r",
       help: "The number of rounds of churn to perform.  0 for infinite.",
       defaultsTo: "0",
-    )
+    );
 }
 
 void printUsage(ArgParser argParser) {
