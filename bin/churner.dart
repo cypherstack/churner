@@ -227,7 +227,7 @@ Future<void> main(List<String> arguments) async {
       print("\x1B[2J\x1B[0;0H");
     }
 
-    wallet.connect(
+    await wallet.connect(
       daemonAddress: nodeConfig.uri,
       trusted: nodeConfig.trusted,
       daemonUsername: nodeConfig.user,
