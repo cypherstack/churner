@@ -178,8 +178,14 @@ Future<void> main(List<String> arguments) async {
 
     final walletExists = MoneroWallet.isWalletExist(walletConfig.path);
     if (!walletExists) {
-      if (verbose) {
-        print("Wallet not found: ${walletConfig.path}");
+      print("Wallet not found: ${walletConfig.path}");
+
+      // Prompt the user as to if they want to create a new wallet at the path.
+      print("Would you like to create a new wallet at this path? (y/n)");
+      final response = stdin.readLineSync();
+      if (response?.toLowerCase() != "y") {
+        print("Exiting.");
+        return;
       }
 
       // Create the wallet.
