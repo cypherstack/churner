@@ -285,6 +285,7 @@ Future<void> churnOnce({
 
     // Delay for a bit before checking again.
     await Future.delayed(const Duration(seconds: 30));
+    return;
   }
 
   // rng
