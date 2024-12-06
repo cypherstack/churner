@@ -91,8 +91,8 @@ ArgParser buildParser() {
 }
 
 void printUsage(ArgParser argParser) {
-  print("Usage: dart churner.dart <flags> [arguments]");
-  print(argParser.usage);
+  l("Usage: dart churner.dart <flags> [arguments]");
+  l(argParser.usage);
 }
 
 class WalletConfig {
@@ -130,7 +130,7 @@ Future<void> main(List<String> arguments) async {
       return;
     }
     if (results.wasParsed("version")) {
-      print("churner version: $version");
+      l("churner version: $version");
       return;
     }
     if (results.wasParsed("verbose")) {
@@ -154,17 +154,17 @@ Future<void> main(List<String> arguments) async {
     final churnRounds = int.parse(results["rounds"]);
 
     if (verbose) {
-      print("[VERBOSE] Configuration settings being applied:");
-      print("   Wallet path: ${results["wallet"]}");
-      print("   Node URL: ${results["node"]}");
-      print("   Network type: ${results["network"]} (${{
+      l("[VERBOSE] Configuration settings being applied:");
+      l("   Wallet path: ${results["wallet"]}");
+      l("   Node URL: ${results["node"]}");
+      l("   Network type: ${results["network"]} (${{
         "0": "mainnet",
         "1": "testnet",
         "2": "stagenet"
       }[results["network"]]})");
-      print("   Using SSL: ${results["ssl"]}");
-      print("   Node trusted: ${results["trusted"]}");
-      print("   Churn rounds: ${results["rounds"]} (0 = infinite)");
+      l("   Using SSL: ${results["ssl"]}");
+      l("   Node trusted: ${results["trusted"]}");
+      l("   Churn rounds: ${results["rounds"]} (0 = infinite)");
     }
 
     // set path of .so lib
@@ -179,20 +179,20 @@ Future<void> main(List<String> arguments) async {
     );
 
     if (verbose) {
-      print("Positional arguments: ${results.rest}");
-      print("[VERBOSE] All arguments: ${results.arguments}");
+      l("Positional arguments: ${results.rest}");
+      l("[VERBOSE] All arguments: ${results.arguments}");
     }
 
     final MoneroWallet wallet;
     final walletExists = MoneroWallet.isWalletExist(walletConfig.path);
     if (!walletExists) {
-      print("Wallet not found: ${walletConfig.path}");
+      l("Wallet not found: ${walletConfig.path}");
 
       // Prompt the user as to if they want to create a new wallet at the path.
-      print("Would you like to create a new wallet at this path? (y/n)");
+      l("Would you like to create a new wallet at this path? (y/n)");
       final response = stdin.readLineSync();
       if (response?.toLowerCase() != "y") {
-        print("Exiting.");
+        l("Exiting.");
         return;
       }
 
@@ -207,27 +207,26 @@ Future<void> main(List<String> arguments) async {
       } catch (e, s) {
         throw Exception("Error creating wallet: $e\n$s");
       }
-      print("Wallet created successfully.");
+      l("Wallet created successfully.");
     } else {
       wallet = MoneroWallet.loadWallet(
         path: walletConfig.path,
         password: walletConfig.pass,
         networkType: network,
       );
-      print("Wallet Loaded");
+      l("Wallet Loaded");
     }
 
     if (!walletExists) {
       // Show the seed to the user for backup.
       final seed = wallet.getSeed();
-      print("The wallet seed needs to be backed up!  Press ENTER to view it.");
+      l("The wallet seed needs to be backed up!  Press ENTER to view it.");
       stdin.readLineSync();
-      print("Wallet seed: $seed");
-      print(
-          "Press ENTER to continue.  The screen will be cleared in order to hide the seed for privacy.");
+      l("Wallet seed: $seed");
+      l("Press ENTER to continue.  The screen will be cleared in order to hide the seed for privacy.");
       stdin.readLineSync();
       // Clear the console.
-      print("\x1B[2J\x1B[0;0H");
+      l("\x1B[2J\x1B[0;0H");
     }
 
     await wallet.connect(
@@ -251,11 +250,11 @@ Future<void> main(List<String> arguments) async {
     // Wait for syncing to complete.
     while (!(await wallet.isSynced())) {
       if (verbose) {
-        print("Wallet syncing...");
+        l("Wallet syncing...");
       }
       await Future.delayed(const Duration(seconds: 5));
     }
-    print("Wallet synced.");
+    l("Wallet synced.");
 
     int churnCount = 0;
     // If churnRounds == 0, we churn indefinitely.
@@ -271,25 +270,25 @@ Future<void> main(List<String> arguments) async {
         if (churned) {
           churnCount++;
           if (verbose && churnRounds > 0) {
-            print("Churned $churnCount/$churnRounds times.");
+            l("Churned $churnCount/$churnRounds times.");
           }
         }
       } catch (e, s) {
-        print("Error while churning: $e\n$s");
+        l("Error while churning: $e\n$s");
         // Add a small delay as a hackfix for the "No unlocked balance" (non-)issue.
         await Future.delayed(const Duration(seconds: 60));
       }
     }
 
-    print("Completed $churnCount churn round(s). Exiting.");
+    l("Completed $churnCount churn round(s). Exiting.");
   } on FormatException catch (e) {
     // Print usage information if an invalid argument was provided.
-    print(e.message);
-    print("");
+    l(e.message);
+    l("");
     printUsage(buildParser());
   } catch (e, st) {
-    print("Error occurred: $e");
-    print(st);
+    l("Error occurred: $e");
+    l(st);
   }
 }
 
@@ -316,21 +315,20 @@ Future<bool> churnOnce({
     refresh: true,
   );
   if (myOutputs.isEmpty) {
-    print(
-        "No unspent outputs available.  Please send funds to this address:\n");
+    l("No unspent outputs available.  Please send funds to this address:\n");
 
     final String address = wallet
         .getAddress()
         .value; // TODO: If account is made configurable elsewhere we should respect that here, too.
-    print(address);
-    print(AsciiQrGenerator.generate("monero:$address"));
+    l(address);
+    l(AsciiQrGenerator.generate("monero:$address"));
 
     // Delay for a bit before checking again.
     await Future.delayed(const Duration(seconds: 30));
     return false;
   }
   if (verbose) {
-    print("Found ${myOutputs.length} unspent outputs.");
+    l("Found ${myOutputs.length} unspent outputs.");
   }
 
   // rng
@@ -342,13 +340,13 @@ Future<bool> churnOnce({
   myOutputs.shuffle(random);
   final outputToChurn = myOutputs.first;
   if (verbose) {
-    print("Using output for churn operation:");
-    print("   Transaction hash: ${outputToChurn.hash}");
-    print("   Block height: ${outputToChurn.height}");
-    print("   Amount: ${outputToChurn.value} atomic units");
+    l("Using output for churn operation:");
+    l("   Transaction hash: ${outputToChurn.hash}");
+    l("   Block height: ${outputToChurn.height}");
+    l("   Amount: ${outputToChurn.value} atomic units");
   }
 
-  print("Creating churn transaction...");
+  l("Creating churn transaction...");
   final accountIndex = 0; // Could be configurable.
   final pending = await wallet.createTx(
     output: Recipient(
@@ -365,18 +363,18 @@ Future<bool> churnOnce({
     sweep: true,
   );
   if (verbose) {
-    print("Transaction details:");
-    print("   Transaction hash: ${pending.txid}");
-    print("   Amount: ${pending.amount}");
-    print("   Fee: ${pending.fee}");
+    l("Transaction details:");
+    l("   Transaction hash: ${pending.txid}");
+    l("   Amount: ${pending.amount}");
+    l("   Fee: ${pending.fee}");
   }
   final deserializedTx = DeserializedTransaction.deserialize(pending.hex);
   if (verbose) {
-    print("Deserialized transaction:");
-    print("   Version: ${deserializedTx.version}");
-    print("   Unlock time: ${deserializedTx.unlockTime}");
-    print("   Inputs: ${deserializedTx.vin.length}");
-    print("   Outputs: ${deserializedTx.vout.length}");
+    l("Deserialized transaction:");
+    l("   Version: ${deserializedTx.version}");
+    l("   Unlock time: ${deserializedTx.unlockTime}");
+    l("   Inputs: ${deserializedTx.vin.length}");
+    l("   Outputs: ${deserializedTx.vout.length}");
   }
 
   // Extract key offsets.
@@ -384,8 +382,8 @@ Future<bool> churnOnce({
   for (var input in deserializedTx.vin) {
     if (input is TxinToKey) {
       if (verbose) {
-        print("Key Image: ${_bytesToHex(input.keyImage)}");
-        print("Key Offsets: ${input.keyOffsets}");
+        l("Key Image: ${_bytesToHex(input.keyImage)}");
+        l("Key Offsets: ${input.keyOffsets}");
       }
       relativeOffsets = input.keyOffsets.map((e) => e.toInt()).toList();
       break; // Select first input for demonstration purposes.
@@ -396,9 +394,8 @@ Future<bool> churnOnce({
     throw Exception("No key offsets found in transaction inputs.");
   }
   if (verbose) {
-    print("Relative key offsets: $relativeOffsets");
-    print(
-        "Absolute key offsets: ${convertRelativeToAbsolute(relativeOffsets)}");
+    l("Relative key offsets: $relativeOffsets");
+    l("Absolute key offsets: ${convertRelativeToAbsolute(relativeOffsets)}");
   }
 
   final daemonRpc = DaemonRpc(
@@ -412,8 +409,8 @@ Future<bool> churnOnce({
     throw Exception("No outputs returned from get_outs call.");
   }
   if (verbose) {
-    print("get_outs result:");
-    print("   Outputs: ${getOutsResult.outs.length}");
+    l("get_outs result:");
+    l("   Outputs: ${getOutsResult.outs.length}");
   }
 
   // Remove our real input from the list, leaving just decoy inputs.
@@ -424,7 +421,7 @@ Future<bool> churnOnce({
   final removedCount = originalLength - getOutsResult.outs.length;
   if (verbose) {
     if (removedCount == 1) {
-      print("Identified our real output among the decoys and removed it.");
+      l("Identified our real output among the decoys and removed it.");
     } else if (removedCount > 1) {
       throw Exception("Removed more than one output from the decoys.");
     } else {
@@ -436,8 +433,8 @@ Future<bool> churnOnce({
   getOutsResult.outs.shuffle(random);
   final randomDecoy = getOutsResult.outs.first;
   if (verbose) {
-    print("Random decoy output height: ${randomDecoy.height}");
-    print("Random decoy output TxID: ${randomDecoy.txid}");
+    l("Random decoy output height: ${randomDecoy.height}");
+    l("Random decoy output TxID: ${randomDecoy.txid}");
   }
 
   // Check conditions and possibly wait before committing.
@@ -478,23 +475,23 @@ Future<bool> checkChurnConditionsAndWaitIfNeeded({
   final ageY = currentHeight - decoyHeight;
 
   if (verbose) {
-    print("\nAge analysis:");
-    print("   Current block height: $currentHeight");
-    print("   Real input (X) block height: ${outputToChurn.height}");
-    print("   Decoy input (Y) block height: $decoyHeight");
-    print("   Age of real input (X): $ageX blocks");
-    print("   Age of decoy input (Y): $ageY blocks");
-    print("\nPrivacy calculation:");
+    l("\nAge analysis:");
+    l("   Current block height: $currentHeight");
+    l("   Real input (X) block height: ${outputToChurn.height}");
+    l("   Decoy input (Y) block height: $decoyHeight");
+    l("   Age of real input (X): $ageX blocks");
+    l("   Age of decoy input (Y): $ageY blocks");
+    l("\nPrivacy calculation:");
     if (ageY > ageX) {
-      print("   Decoy is older than real input - good for privacy");
-      print("   Proceeding with immediate broadcast");
+      l("   Decoy is older than real input - good for privacy");
+      l("   Proceeding with immediate broadcast");
     } else {
-      print("   Real input is older than decoy - suboptimal for privacy");
+      l("   Real input is older than decoy - suboptimal for privacy");
       if (waitToCommit) {
-        print("   Waiting for real input to age sufficiently");
-        print("   Target age difference to overcome: ${ageX - ageY} blocks");
+        l("   Waiting for real input to age sufficiently");
+        l("   Target age difference to overcome: ${ageX - ageY} blocks");
       } else {
-        print("   Discarding transaction per waitToCommit setting");
+        l("   Discarding transaction per waitToCommit setting");
       }
     }
   }
@@ -502,25 +499,23 @@ Future<bool> checkChurnConditionsAndWaitIfNeeded({
   if (ageY > ageX) {
     // X is churnable, broadcast immediately.
     if (verbose) {
-      print("X is churnable.  Broadcasting transaction immediately.");
+      l("X is churnable.  Broadcasting transaction immediately.");
     }
     await wallet.commitTx(pending);
-    print("Transaction broadcasted.");
+    l("Transaction broadcasted.");
     return true;
   } else {
     // X is not churnable.
     if (waitToCommit) {
       // If waitToCommit is true, discard the transaction now.
       if (verbose) {
-        print(
-            "X is not churnable and waitToCommit is true.  Discarding transaction.");
+        l("X is not churnable and waitToCommit is true.  Discarding transaction.");
       }
       return false;
     } else {
       // If waitToCommit is false, wait until Age(X) matches the observed Age(Y).
       if (verbose) {
-        print(
-            "X is not churnable.  Waiting until Age(X) reaches previously observed Age(Y)=$ageY before broadcasting.");
+        l("X is not churnable.  Waiting until Age(X) reaches previously observed Age(Y)=$ageY before broadcasting.");
       }
 
       final targetAgeY = ageY;
@@ -528,8 +523,7 @@ Future<bool> checkChurnConditionsAndWaitIfNeeded({
         final newHeight = await getCurrentHeight(daemonRpc);
         final newAgeX = newHeight - outputToChurn.height;
         if (verbose) {
-          print(
-              "Current block height: $newHeight. Age(X): $newAgeX, waiting for Age(X) >= $targetAgeY");
+          l("Current block height: $newHeight. Age(X): $newAgeX, waiting for Age(X) >= $targetAgeY");
         }
         if (newAgeX >= targetAgeY) {
           break; // Conditions met: broadcast.
@@ -538,11 +532,10 @@ Future<bool> checkChurnConditionsAndWaitIfNeeded({
       }
 
       if (verbose) {
-        print(
-            "Conditions met (Age(X) caught up to Age(Y)). Broadcasting transaction...");
+        l("Conditions met (Age(X) caught up to Age(Y)). Broadcasting transaction...");
       }
       await wallet.commitTx(pending);
-      print("Transaction broadcasted.");
+      l("Transaction broadcasted.");
       return true;
     }
   }
@@ -582,4 +575,9 @@ List<int> convertRelativeToAbsolute(List<int> relativeOffsets) {
     absoluteOffsets.add(sum);
   }
   return absoluteOffsets;
+}
+
+void l(Object? object) {
+  // ignore: avoid_print
+  print(object);
 }
