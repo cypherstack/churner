@@ -347,6 +347,7 @@ Future<bool> churnOnce({
     print("   Amount: ${outputToChurn.value} atomic units");
   }
 
+  print("Creating churn transaction...");
   final accountIndex = 0; // Could be configurable.
   final pending = await wallet.createTx(
     output: Recipient(
