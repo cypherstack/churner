@@ -249,6 +249,12 @@ Future<void> churnOnce({
     refresh: true,
   );
   if (myOutputs.isEmpty) {
+    print(
+        "No unspent outputs available.  Please send funds to this address:\n");
+    print(wallet
+        .getAddress()
+        .value); // TODO: If account is made configurable elsewhere we should respect that here, too.
+
     throw Exception("No unspent outputs available.");
   }
 
