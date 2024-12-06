@@ -277,6 +277,8 @@ Future<void> main(List<String> arguments) async {
         }
       } catch (e, s) {
         print("Error while churning: $e\n$s");
+        // Add a small delay as a hackfix for the "No unlocked balance" (non-)issue.
+        await Future.delayed(const Duration(seconds: 60));
       }
     }
 
