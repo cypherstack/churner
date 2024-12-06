@@ -1,3 +1,10 @@
+/// General churning flow:
+///
+/// 1. Sync a wallet.
+/// 2. Create but do not broadcast a transaction spending one output/key image.
+/// 3. Get the block height associated with one of the decoy inputs.
+/// 4. Broadcast tx when the decoy input is as old or older than the real input.
+
 import 'dart:io';
 
 import 'package:args/args.dart';
