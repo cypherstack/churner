@@ -19,8 +19,22 @@ A command-line tool written in Dart for automated Monero coin churning.
 ```bash
 git clone https://github.com/cypherstack/churner
 cd churner
-dart run tools/build.dart
+dart pub get
+dart run tools/build.dart linux
 dart run bin/churner.dart --help
+```
+
+## Building executable
+```bash
+git clone https://github.com/cypherstack/churner
+cd churner
+dart pub get
+dart run tools/build.dart linux
+mkdir -p build
+cp 
+dart compile exe bin/churner.dart -o build/churner
+cd build
+tar -czvf churner_v<insert version here>.tar.gz churner ../bin/monero_libwallet2_api_c.so
 ```
 
 ### First Run

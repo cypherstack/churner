@@ -229,6 +229,8 @@ Future<void> main(List<String> arguments) async {
       l("\x1B[2J\x1B[0;0H");
     }
 
+    l("Connecting to: \"${nodeConfig.uri}\" ...");
+
     await wallet.connect(
       daemonAddress: nodeConfig.uri,
       trusted: nodeConfig.trusted,
@@ -242,6 +244,8 @@ Future<void> main(List<String> arguments) async {
     if (!connected) {
       throw Exception("Failed to connect to daemon: ${nodeConfig.uri}");
     }
+
+    l("Connected");
 
     wallet.startSyncing();
 
