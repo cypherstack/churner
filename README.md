@@ -31,7 +31,6 @@ cd churner
 dart pub get
 dart run tools/build.dart linux
 mkdir -p build
-cp 
 dart compile exe bin/churner.dart -o build/churner
 cd build
 tar -czvf churner_v<insert version here>.tar.gz churner ../bin/monero_libwallet2_api_c.so
