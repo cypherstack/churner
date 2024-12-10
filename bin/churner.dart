@@ -118,6 +118,9 @@ class NodeConfig {
   });
 }
 
+final accountIndex =
+    0; // TODO: make configurable via cli arg and get rid of global variable here.
+
 Future<void> main(List<String> arguments) async {
   final ArgParser argParser = buildParser();
   bool verbose = false;
@@ -321,9 +324,7 @@ Future<bool> churnOnce({
   if (myOutputs.isEmpty) {
     l("No unspent outputs available.  Please send funds to this address:\n");
 
-    final String address = wallet
-        .getAddress()
-        .value; // TODO: If account is made configurable elsewhere we should respect that here, too.
+    final String address = wallet.getAddress(accountIndex: accountIndex).value;
     l(address);
     l(AsciiQrGenerator.generate("monero:$address"));
 
@@ -351,7 +352,6 @@ Future<bool> churnOnce({
   }
 
   l("Creating churn transaction...");
-  final accountIndex = 0; // Could be configurable.
   final pending = await wallet.createTx(
     output: Recipient(
       address: wallet
