@@ -87,6 +87,12 @@ ArgParser buildParser() {
       abbr: "r",
       help: "The number of rounds of churn to perform.  0 for infinite.",
       defaultsTo: "0",
+    )
+    ..addOption(
+      "account",
+      abbr: "a",
+      help: "The wallet account to use.  0 by default.",
+      defaultsTo: "0",
     );
 }
 
@@ -117,9 +123,6 @@ class NodeConfig {
     required this.trusted,
   });
 }
-
-final accountIndex =
-    0; // TODO: make configurable via cli arg and get rid of global variable here.
 
 Future<void> main(List<String> arguments) async {
   final ArgParser argParser = buildParser();
@@ -155,6 +158,7 @@ Future<void> main(List<String> arguments) async {
 
     final network = int.parse(results["network"] as String);
     final churnRounds = int.parse(results["rounds"] as String);
+    final accountIndex = int.parse(results["account"] as String);
 
     if (verbose) {
       l("[VERBOSE] Configuration settings being applied:");
@@ -268,12 +272,12 @@ Future<void> main(List<String> arguments) async {
     while (churnRounds == 0 || churnCount < churnRounds) {
       try {
         final churned = await churnOnce(
-          wallet: wallet,
-          daemonAddress: nodeConfig.uri,
-          daemonUsername: nodeConfig.user,
-          daemonPassword: nodeConfig.pass,
-          verbose: verbose,
-        );
+            wallet: wallet,
+            daemonAddress: nodeConfig.uri,
+            daemonUsername: nodeConfig.user,
+            daemonPassword: nodeConfig.pass,
+            verbose: verbose,
+            accountIndex: accountIndex);
         if (churned) {
           churnCount++;
           if (verbose && churnRounds > 0) {
@@ -316,6 +320,7 @@ Future<bool> churnOnce({
   String? daemonPassword,
   bool verbose = false,
   bool waitToCommit = true,
+  int accountIndex = 0,
 }) async {
   final myOutputs = await wallet.getOutputs(
     includeSpent: false,
