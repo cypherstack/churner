@@ -196,9 +196,9 @@ Future<void> main(List<String> arguments) async {
       l("Wallet not found: ${walletConfig.path}");
 
       // Prompt the user as to if they want to create a new wallet at the path.
-      l("Would you like to create a new wallet at this path? (y/n)");
+      l("Would you like to create a new wallet at this path? (y/N)");
       final response = stdin.readLineSync();
-      if (response?.toLowerCase() != "y") {
+      if (response?.toLowerCase() != "y" || response?.toUpperCase() == "Y") {
         l("Exiting.");
         return;
       }
@@ -225,15 +225,20 @@ Future<void> main(List<String> arguments) async {
     }
 
     if (!walletExists) {
-      // Show the seed to the user for backup.
-      final seed = wallet.getSeed();
-      l("The wallet seed needs to be backed up!  Press ENTER to view it.");
-      stdin.readLineSync();
-      l("Wallet seed: $seed");
-      l("Press ENTER to continue.  The screen will be cleared in order to hide the seed for privacy.");
-      stdin.readLineSync();
-      // Clear the console.
-      l("\x1B[2J\x1B[0;0H");
+      // Prompt the user as to if they want to show the seed.
+      l("The wallet seed needs to be backed up!  Show the seed now?  (y/N)");
+      final response = stdin.readLineSync();
+      if (response?.toLowerCase() == "y" || response?.toUpperCase() == "Y") {
+        // Show the seed to the user for backup.
+        final seed = wallet.getSeed();
+        l("Wallet seed: $seed");
+        l("Press ENTER to continue.  The screen will be cleared in order to hide the seed for privacy.");
+        stdin.readLineSync();
+        // Clear the console.  As Julian mentioned, this doesn't *really* clear it and the user can scroll up to see it.
+        l("\x1B[2J\x1B[0;0H");
+      } else {
+        l("Not showing seed.  WARNING: If you lose the wallet file and/or forget its password, all funds will be lost permanently.");
+      }
     }
 
     l("Connecting to: \"${nodeConfig.uri}\" ...");
