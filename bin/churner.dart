@@ -772,7 +772,7 @@ class ChurnHistory {
     int maxChurns = 0;
 
     for (final record in _records.values) {
-      totalChurns += record.count;
+      totalChurns++;
       maxChurns = maxChurns > record.count ? maxChurns : record.count;
     }
 
