@@ -396,7 +396,7 @@ Future<bool> churnOnce({
   // rng
   final random = Random.secure();
 
-  // Pick an output at random for churning.
+  // 1. Select an output to churn.
   //
   // In the future we could select a specific output based on some criteria.
   myOutputs.shuffle(random);
@@ -408,10 +408,11 @@ Future<bool> churnOnce({
     l("   Block height: ${outputToChurn.height}");
     l("   Amount: ${outputToChurn.value} atomic units");
     if (churnHistory != null) {
-      l("   Previous churn count: ${churnHistory.getChurnCount(outputToChurn, outputIndex: outputToChurn.vout)}");
+      l("   Previous churn count: ${churnHistory.getChurnCount(outputToChurn)}");
     }
   }
 
+  // 2. Create a transaction (not broadcasted).
   l("Creating churn transaction...");
   final pending = await wallet.createTx(
     output: Recipient(
@@ -438,22 +439,35 @@ Future<bool> churnOnce({
     l("   Outputs: ${deserializedTx.vout.length}");
   }
 
-  // Extract key offsets.
-  final List<List<int>> relativeOffsets = [];
+  // 3. Deserialize and inspect inputs via key offsets.
+  List<int>? relativeOffsets;
   for (final input in deserializedTx.vin) {
     if (input is TxinToKey) {
+      final inputKeyImageHex = _bytesToHex(input.keyImage);
       if (verbose) {
-        l("Key Image: ${_bytesToHex(input.keyImage)}");
-        l("Key Offsets: ${input.keyOffsets}");
+        l("Processing TxinToKey input:");
+        l("   Key Image: $inputKeyImageHex");
+        l("   Key Offsets: ${input.keyOffsets}");
       }
-      relativeOffsets.add(input.keyOffsets.map((e) => e.toInt()).toList());
+
+      // Check if this input corresponds to outputToChurn by matching key images.
+      if (inputKeyImageHex == outputToChurn.keyImage) {
+        if (verbose) {
+          l("Matched key image with outputToChurn.");
+        }
+        relativeOffsets = input.keyOffsets.map((e) => e.toInt()).toList();
+        break; // Found the relevant input, no need to process further.
+      }
     }
   }
-  if (relativeOffsets.isEmpty) {
-    throw Exception("No key offsets found in transaction inputs.");
+
+  if (relativeOffsets == null) {
+    throw Exception(
+        "No matching key offsets found for outputToChurn in transaction inputs.");
   }
+
   if (verbose) {
-    l("Relative key offsets: $relativeOffsets");
+    l("Relative key offsets for outputToChurn: $relativeOffsets");
     l("Absolute key offsets: ${convertRelativeToAbsolute(relativeOffsets)}");
   }
 
@@ -462,6 +476,10 @@ Future<bool> churnOnce({
     username: daemonUsername ?? "",
     password: daemonPassword ?? "",
   );
+
+  // 4. Use RPC to retrieve output info...
+  //
+  // Fetch outputs using the absolute key offsets.
   final getOutsResult =
       await daemonRpc.getOuts(convertRelativeToAbsolute(relativeOffsets));
   if (getOutsResult.outs.isEmpty) {
@@ -472,6 +490,8 @@ Future<bool> churnOnce({
     l("   Outputs: ${getOutsResult.outs.length}");
   }
 
+  // 4 cont. ...and remove the real input from the list.
+  //
   // Remove our real input from the list, leaving just decoy inputs.
   final originalLength = getOutsResult.outs.length;
   getOutsResult.outs.removeWhere(
@@ -496,6 +516,8 @@ Future<bool> churnOnce({
     l("Random decoy output TxID: ${randomDecoy.txid}");
   }
 
+  // 5. Check churn conditions and broadcast when appropriate.
+  //
   // Check conditions and possibly wait before committing.
   final churnCompleted = await checkChurnConditionsAndWaitIfNeeded(
     wallet: wallet,
@@ -510,24 +532,13 @@ Future<bool> churnOnce({
   // Record successful churn.
   if (churnCompleted && churnHistory != null) {
     try {
-      // TODO: Determine dynamically.
-      const int newOutputIndex = 0;
-
-      if (verbose) {
-        l("Identified new output index: $newOutputIndex");
-      }
-
       churnHistory.recordChurn(
         outputToChurn,
         pending.txid,
-        newOutputIndex: newOutputIndex,
       );
 
       if (verbose) {
-        final newCount = churnHistory.getChurnCount(
-          outputToChurn,
-          outputIndex: newOutputIndex,
-        );
+        final newCount = churnHistory.getChurnCount(outputToChurn) + 1;
         l("Successfully recorded churn. New count: $newCount");
         final analytics = churnHistory.getAnalytics();
         if (stats &&
@@ -784,7 +795,7 @@ class ChurnHistory {
   }
 
   /// Look up how many times an output has been churned.
-  int getChurnCount(Output output, {int outputIndex = 0}) {
+  int getChurnCount(Output output) {
     final key = output.hash; // Or use hash:vout.  This is good enough for now.
     final count = _records[key]?.count ?? 0;
     if (verbose) {
@@ -866,7 +877,7 @@ class ChurnHistory {
     final List<MapEntry<Output, int>> churnedOutputsWithCounts = [];
 
     for (final output in outputs) {
-      final int churnCount = getChurnCount(output, outputIndex: output.vout);
+      final int churnCount = getChurnCount(output);
       if (verbose) {
         l("Output hash: ${output.hash}, vout: ${output.vout}, churnCount: $churnCount");
         l("Including output: hash=${output.hash}, vout=${output.vout}, churnCount=$churnCount");
