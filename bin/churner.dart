@@ -309,14 +309,15 @@ Future<void> main(List<String> arguments) async {
     while (churnRounds == 0 || churnCount < churnRounds) {
       try {
         final churned = await churnOnce(
-            wallet: wallet,
-            daemonAddress: nodeConfig.uri,
-            daemonUsername: nodeConfig.user,
-            daemonPassword: nodeConfig.pass,
-            verbose: verbose,
-            accountIndex: accountIndex,
-            churnHistory: churnHistory,
-            stats: stats);
+          wallet: wallet,
+          daemonAddress: nodeConfig.uri,
+          daemonUsername: nodeConfig.user,
+          daemonPassword: nodeConfig.pass,
+          verbose: verbose,
+          accountIndex: accountIndex,
+          churnHistory: churnHistory,
+          stats: stats,
+        );
         if (churned) {
           churnCount++;
           if (verbose && churnRounds > 0) {
@@ -376,7 +377,8 @@ Future<bool> churnOnce({
 
     // Delay for a bit before checking again.
     await Future<void>.delayed(
-        const Duration(seconds: 30)); // TODO: Randomize.  Exponential backoff?
+      const Duration(seconds: 30),
+    ); // TODO: Randomize.  Exponential backoff?
     return false;
   }
 
@@ -437,19 +439,17 @@ Future<bool> churnOnce({
   }
 
   // Extract key offsets.
-  List<int>? relativeOffsets;
+  final List<List<int>> relativeOffsets = [];
   for (final input in deserializedTx.vin) {
     if (input is TxinToKey) {
       if (verbose) {
         l("Key Image: ${_bytesToHex(input.keyImage)}");
         l("Key Offsets: ${input.keyOffsets}");
       }
-      relativeOffsets = input.keyOffsets.map((e) => e.toInt()).toList();
-      break; // Select first input for demonstration purposes.
-      // TODO: determine if the above is unacceptable.
+      relativeOffsets.add(input.keyOffsets.map((e) => e.toInt()).toList());
     }
   }
-  if (relativeOffsets == null || relativeOffsets.isEmpty) {
+  if (relativeOffsets.isEmpty) {
     throw Exception("No key offsets found in transaction inputs.");
   }
   if (verbose) {
@@ -524,8 +524,10 @@ Future<bool> churnOnce({
       );
 
       if (verbose) {
-        final newCount = churnHistory.getChurnCount(outputToChurn,
-            outputIndex: newOutputIndex);
+        final newCount = churnHistory.getChurnCount(
+          outputToChurn,
+          outputIndex: newOutputIndex,
+        );
         l("Successfully recorded churn. New count: $newCount");
         final analytics = churnHistory.getAnalytics();
         if (stats &&
@@ -742,8 +744,8 @@ class ChurnHistory {
         } catch (e) {
           // If the file is corrupted, create a simple .bak backup and restart.
           if (file.existsSync()) {
-            file.copySync('${historyPath}.bak');
-            l("Backup of corrupted churn history created at ${historyPath}.bak.");
+            file.copySync('$historyPath.bak');
+            l("Backup of corrupted churn history created at $historyPath.bak.");
           }
           _records.clear();
           l("Error: Corrupted churn history file. Churn history has been reset.");
@@ -792,14 +794,21 @@ class ChurnHistory {
   }
 
   /// Record that an output was churned.
-  void recordChurn(Output oldOutput, String newTxHash,
-      {int oldOutputIndex = 0, int newOutputIndex = 0}) {
+  void recordChurn(
+    Output oldOutput,
+    String newTxHash, {
+    int oldOutputIndex = 0,
+    int newOutputIndex = 0,
+  }) {
     final oldKey = oldOutput.hash;
     final oldCount = _records[oldKey]?.count ?? 0;
 
     final newKey = newTxHash;
     _records[newKey] = ChurnRecord(
-        txHash: newTxHash, outputIndex: newOutputIndex, count: oldCount + 1);
+      txHash: newTxHash,
+      outputIndex: newOutputIndex,
+      count: oldCount + 1,
+    );
 
     if (verbose) {
       l("Churned output $oldKey -> $newKey.  (Churned ${oldCount + 1} times.)");
@@ -858,8 +867,7 @@ class ChurnHistory {
     final List<MapEntry<Output, int>> churnedOutputsWithCounts = [];
 
     for (final output in outputs) {
-      final int churnCount =
-          this.getChurnCount(output, outputIndex: output.vout);
+      final int churnCount = getChurnCount(output, outputIndex: output.vout);
       if (verbose) {
         l("Output hash: ${output.hash}, vout: ${output.vout}, churnCount: $churnCount");
         l("Including output: hash=${output.hash}, vout=${output.vout}, churnCount=$churnCount");
