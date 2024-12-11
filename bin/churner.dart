@@ -823,7 +823,6 @@ class ChurnHistory {
       return {
         'totalOutputs': 0,
         'totalChurns': 0,
-        'averageChurns': 0,
         'maxChurns': 0,
       };
     }
