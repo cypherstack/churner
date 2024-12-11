@@ -194,7 +194,6 @@ Future<void> main(List<String> arguments) async {
       l("   Churn history loaded:");
       l("      Total outputs tracked: ${analytics['totalOutputs']}");
       l("      Total churns performed: ${analytics['totalChurns']}");
-      l("      Average churns per output: ${analytics['averageChurns'].toStringAsFixed(2)}");
     }
 
     // set path of .so lib
@@ -535,7 +534,6 @@ Future<bool> churnOnce({
           l("   Churn history:");
           l("      Total outputs tracked: ${analytics['totalOutputs']}");
           l("      Total churns performed: ${analytics['totalChurns']}");
-          l("      Average churns per output: ${analytics['averageChurns'].toStringAsFixed(2)}");
         }
       }
     } catch (e, s) {
@@ -834,7 +832,6 @@ class ChurnHistory {
     return {
       'totalOutputs': _records.length,
       'totalChurns': totalChurns,
-      'averageChurns': totalChurns / _records.length,
       'maxChurns': maxChurns,
     };
   }
