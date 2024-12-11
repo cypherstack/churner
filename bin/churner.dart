@@ -94,6 +94,12 @@ ArgParser buildParser() {
       abbr: "a",
       help: "The wallet account to use.  0 by default.",
       defaultsTo: "0",
+    )
+    ..addFlag(
+      "stats",
+      abbr: "s",
+      help: "Show churning statistics/analytics.",
+      defaultsTo: false,
     );
 }
 
@@ -128,6 +134,7 @@ class NodeConfig {
 Future<void> main(List<String> arguments) async {
   final ArgParser argParser = buildParser();
   bool verbose = false;
+  bool stats = false;
   try {
     final ArgResults results = argParser.parse(arguments);
 
@@ -142,6 +149,9 @@ Future<void> main(List<String> arguments) async {
     }
     if (results.wasParsed("verbose")) {
       verbose = true;
+    }
+    if (results.wasParsed("stats")) {
+      stats = true;
     }
 
     // Extract arguments
@@ -180,7 +190,7 @@ Future<void> main(List<String> arguments) async {
     }
 
     final analytics = churnHistory.getAnalytics();
-    if (verbose && int.parse("${analytics['totalOutputs']}") > 0) {
+    if (stats && int.parse("${analytics['totalOutputs']}") > 0) {
       l("   Churn history loaded:");
       l("      Total outputs tracked: ${analytics['totalOutputs']}");
       l("      Total churns performed: ${analytics['totalChurns']}");
@@ -296,7 +306,8 @@ Future<void> main(List<String> arguments) async {
             daemonPassword: nodeConfig.pass,
             verbose: verbose,
             accountIndex: accountIndex,
-            churnHistory: churnHistory);
+            churnHistory: churnHistory,
+            stats: stats);
         if (churned) {
           churnCount++;
           if (verbose && churnRounds > 0) {
@@ -341,6 +352,7 @@ Future<bool> churnOnce({
   bool waitToCommit = true,
   int accountIndex = 0,
   ChurnHistory? churnHistory,
+  bool stats = false,
 }) async {
   final myOutputs = await wallet.getOutputs(
     includeSpent: false,
@@ -366,8 +378,7 @@ Future<bool> churnOnce({
       l("Churn history statistics:");
       l("   Total outputs tracked: ${analytics['totalOutputs']}");
       l("   Total churns performed: ${analytics['totalChurns']}");
-      l("   Average churns per output: ${analytics['averageChurns'].toStringAsFixed(2)}");
-      l("   Maximum churns for any output: ${analytics['maxChurns']}");
+      l("   Most churns for any output: ${analytics['maxChurns']}");
     }
   }
 
@@ -494,6 +505,13 @@ Future<bool> churnOnce({
       if (verbose) {
         final newCount = churnHistory.getChurnCount(outputToChurn) + 1;
         l("Successfully recorded churn. New count: $newCount");
+        final analytics = churnHistory.getAnalytics();
+        if (stats && int.parse("${analytics['totalOutputs']}") > 0) {
+          l("   Churn history:");
+          l("      Total outputs tracked: ${analytics['totalOutputs']}");
+          l("      Total churns performed: ${analytics['totalChurns']}");
+          l("      Average churns per output: ${analytics['averageChurns'].toStringAsFixed(2)}");
+        }
       }
     } catch (e) {
       l("Warning: Failed to record churn: $e");
