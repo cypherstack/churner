@@ -295,7 +295,8 @@ Future<void> main(List<String> arguments) async {
             daemonUsername: nodeConfig.user,
             daemonPassword: nodeConfig.pass,
             verbose: verbose,
-            accountIndex: accountIndex);
+            accountIndex: accountIndex,
+            churnHistory: churnHistory);
         if (churned) {
           churnCount++;
           if (verbose && churnRounds > 0) {
@@ -497,6 +498,10 @@ Future<bool> churnOnce({
     } catch (e) {
       l("Warning: Failed to record churn: $e");
       // Continue execution as this is not critical
+    }
+  } else {
+    if (verbose) {
+      l("Not recording churn.  Churn completed: $churnCompleted.  Is churn history null?: ${churnHistory == null}");
     }
   }
 
