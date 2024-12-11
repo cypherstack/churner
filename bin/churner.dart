@@ -282,6 +282,16 @@ Future<void> main(List<String> arguments) async {
 
     l("Connected");
 
+    if (stats) {
+      l("Outputs that have been churned:");
+      final churnedOutputsWithCounts = await churnHistory
+          .getChurnedOutputsWithCounts(wallet: wallet, minimumChurns: 1);
+      l("   Found ${churnedOutputsWithCounts.length} churned outputs.");
+      for (final entry in churnedOutputsWithCounts) {
+        l("   ${entry.key.keyImage} - ${entry.value} churns");
+      }
+    }
+
     wallet.startSyncing();
 
     wallet.startAutoSaving();
@@ -397,7 +407,7 @@ Future<bool> churnOnce({
     l("   Block height: ${outputToChurn.height}");
     l("   Amount: ${outputToChurn.value} atomic units");
     if (churnHistory != null) {
-      l("   Previous churn count: ${churnHistory.getChurnCount(outputToChurn)}");
+      l("   Previous churn count: ${churnHistory.getChurnCount(outputToChurn, outputIndex: outputToChurn.vout)}");
     }
   }
 
@@ -725,6 +735,9 @@ class ChurnHistory {
       if (file.existsSync()) {
         final content = file.readAsStringSync();
         if (content.isEmpty) {
+          if (verbose) {
+            l("Churn history file is empty. No records loaded.");
+          }
           return;
         }
 
@@ -737,6 +750,9 @@ class ChurnHistory {
               final record =
                   ChurnRecord.fromJson(value as Map<String, dynamic>);
               _records[key] = record;
+              if (verbose) {
+                l("Loaded ChurnRecord: $key -> ${record.count}");
+              }
             } catch (e) {
               l("Warning: Failed to parse record $key: $e");
             }
@@ -745,9 +761,14 @@ class ChurnHistory {
           // If the file is corrupted, create a simple .bak backup and restart.
           if (file.existsSync()) {
             file.copySync('${historyPath}.bak');
+            l("Backup of corrupted churn history created at ${historyPath}.bak.");
           }
           _records.clear();
-          l("Error: Corrupted churn history file.  Backup created at ${historyPath}.bak.");
+          l("Error: Corrupted churn history file. Churn history has been reset.");
+        }
+      } else {
+        if (verbose) {
+          l("Churn history file does not exist. Starting fresh.");
         }
       }
     } catch (e) {
@@ -771,7 +792,7 @@ class ChurnHistory {
       File(tempPath).renameSync(historyPath);
 
       if (verbose) {
-        print("Churn history saved to $historyPath.");
+        l("Churn history saved to $historyPath.");
       }
     } catch (e, s) {
       l("Warning: Failed to save churn history: $e\n$s");
@@ -781,7 +802,11 @@ class ChurnHistory {
   /// Look up how many times an output has been churned.
   int getChurnCount(Output output, {int outputIndex = 0}) {
     final key = _getOutputKey(output.hash, outputIndex);
-    return _records[key]?.count ?? 0;
+    final count = _records[key]?.count ?? 0;
+    if (verbose) {
+      l("getChurnCount - key: $key, count: $count");
+    }
+    return count;
   }
 
   /// Record that an output was churned.
@@ -795,10 +820,9 @@ class ChurnHistory {
         txHash: newTxHash, outputIndex: newOutputIndex, count: oldCount + 1);
 
     if (verbose) {
-      print(
-          "Churned output $oldKey -> $newKey.  (Churned ${oldCount + 1} times.)");
+      l("Churned output $oldKey -> $newKey.  (Churned ${oldCount + 1} times.)");
+      l("recordChurn - newKey: $newKey, count: ${_records[newKey]?.count}");
     }
-
     save();
   }
 
@@ -817,8 +841,10 @@ class ChurnHistory {
     int maxChurns = 0;
 
     for (final record in _records.values) {
-      totalChurns++;
-      maxChurns = maxChurns > record.count ? maxChurns : record.count;
+      totalChurns += record.count;
+      if (record.count > maxChurns) {
+        maxChurns = record.count;
+      }
     }
 
     return {
@@ -827,5 +853,45 @@ class ChurnHistory {
       'averageChurns': totalChurns / _records.length,
       'maxChurns': maxChurns,
     };
+  }
+
+  /// Retrieves a list of outputs with churn counts above [minimumChurns] times.
+  ///
+  /// - [wallet]: The Monero wallet instance.
+  /// - [minimumChurns]: The minimum number of churns required for an output to be included.
+  ///
+  /// Returns a [Future] that completes with a [List<MapEntry<Output, int>>] of churned outputs and their counts.
+  Future<List<MapEntry<Output, int>>> getChurnedOutputsWithCounts({
+    required MoneroWallet wallet,
+    int minimumChurns = 1,
+  }) async {
+    final List<Output> outputs = await wallet.getOutputs(
+      includeSpent: false,
+      refresh: true,
+    );
+
+    if (verbose) {
+      l("Total outputs fetched from wallet: ${outputs.length}");
+    }
+
+    final List<MapEntry<Output, int>> churnedOutputsWithCounts = [];
+
+    for (final output in outputs) {
+      final int churnCount =
+          this.getChurnCount(output, outputIndex: output.vout);
+      if (verbose) {
+        l("Output hash: ${output.hash}, vout: ${output.vout}, churnCount: $churnCount");
+        l("Including output: hash=${output.hash}, vout=${output.vout}, churnCount=$churnCount");
+      }
+      if (churnCount >= minimumChurns) {
+        churnedOutputsWithCounts.add(MapEntry(output, churnCount));
+      }
+    }
+
+    if (verbose) {
+      l("Total churned outputs found: ${churnedOutputsWithCounts.length}");
+    }
+
+    return churnedOutputsWithCounts;
   }
 }
