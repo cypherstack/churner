@@ -689,22 +689,18 @@ void l(Object? object) {
 
 /// Represents a single churned output with its identifier and count.
 class ChurnRecord {
-  final String txHash;
   int count;
 
   ChurnRecord({
-    required this.txHash,
     this.count = 0,
   });
 
   Map<String, dynamic> toJson() => {
-        'txHash': txHash,
         'count': count,
       };
 
   factory ChurnRecord.fromJson(Map<String, dynamic> json) {
     return ChurnRecord(
-      txHash: json['txHash'] as String,
       count: json['count'] as int,
     );
   }
@@ -803,20 +799,18 @@ class ChurnHistory {
   /// Record that an output was churned.
   void recordChurn(
     Output oldOutput,
-    String newTxHash,
+    String txHash,
   ) {
     final oldKey = oldOutput.hash;
     final oldCount = _records[oldKey]?.count ?? 0;
 
-    final newKey = newTxHash;
-    _records[newKey] = ChurnRecord(
-      txHash: newTxHash,
+    _records[txHash] = ChurnRecord(
       count: oldCount + 1,
     );
 
     if (verbose) {
-      l("Churned output $oldKey -> $newKey.  (Churned ${oldCount + 1} times.)");
-      l("recordChurn - newKey: $newKey, count: ${_records[newKey]?.count}");
+      l("Churned output $oldKey -> $txHash.  (Churned ${oldCount + 1} times.)");
+      l("recordChurn - newKey: $txHash, count: ${_records[txHash]?.count}");
     }
     save();
   }
