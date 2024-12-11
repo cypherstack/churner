@@ -511,20 +511,8 @@ Future<bool> churnOnce({
   // Record successful churn.
   if (churnCompleted && churnHistory != null) {
     try {
-      // Find the new output index from the deserialized transaction.
-      int? newOutputIndex;
-      for (int i = 0; i < deserializedTx.vout.length; i++) {
-        final txOut = deserializedTx.vout[i];
-        // Match based on value/amount.
-        if (txOut.amount == outputToChurn.value) {
-          newOutputIndex = i;
-          break;
-        }
-      }
-
-      if (newOutputIndex == null) {
-        throw Exception("Failed to identify the new output index.");
-      }
+      // TODO: Determine dynamically.
+      const int newOutputIndex = 0;
 
       if (verbose) {
         l("Identified new output index: $newOutputIndex");
@@ -724,10 +712,6 @@ class ChurnHistory {
   ChurnHistory(String walletPath, this.verbose)
       : historyPath = '$walletPath.json';
 
-  String _getOutputKey(String txHash, int outputIndex) {
-    return '$txHash:$outputIndex';
-  }
-
   /// Load churn history from file.
   void load() {
     try {
@@ -801,7 +785,7 @@ class ChurnHistory {
 
   /// Look up how many times an output has been churned.
   int getChurnCount(Output output, {int outputIndex = 0}) {
-    final key = _getOutputKey(output.hash, outputIndex);
+    final key = output.hash; // Or use hash:vout.  This is good enough for now.
     final count = _records[key]?.count ?? 0;
     if (verbose) {
       l("getChurnCount - key: $key, count: $count");
@@ -812,10 +796,10 @@ class ChurnHistory {
   /// Record that an output was churned.
   void recordChurn(Output oldOutput, String newTxHash,
       {int oldOutputIndex = 0, int newOutputIndex = 0}) {
-    final oldKey = _getOutputKey(oldOutput.hash, oldOutputIndex);
+    final oldKey = oldOutput.hash;
     final oldCount = _records[oldKey]?.count ?? 0;
 
-    final newKey = _getOutputKey(newTxHash, newOutputIndex);
+    final newKey = newTxHash;
     _records[newKey] = ChurnRecord(
         txHash: newTxHash, outputIndex: newOutputIndex, count: oldCount + 1);
 
