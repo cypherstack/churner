@@ -501,21 +501,48 @@ Future<bool> churnOnce({
   // Record successful churn.
   if (churnCompleted && churnHistory != null) {
     try {
-      churnHistory.recordChurn(outputToChurn, pending.txid);
+      // Find the new output index from the deserialized transaction.
+      int? newOutputIndex;
+      for (int i = 0; i < deserializedTx.vout.length; i++) {
+        final txOut = deserializedTx.vout[i];
+        // Match based on value/amount.
+        if (txOut.amount == outputToChurn.value) {
+          newOutputIndex = i;
+          break;
+        }
+      }
+
+      if (newOutputIndex == null) {
+        throw Exception("Failed to identify the new output index.");
+      }
+
       if (verbose) {
-        final newCount = churnHistory.getChurnCount(outputToChurn) + 1;
+        l("Identified new output index: $newOutputIndex");
+      }
+
+      churnHistory.recordChurn(
+        outputToChurn,
+        pending.txid,
+        newOutputIndex: newOutputIndex,
+      );
+
+      if (verbose) {
+        final newCount = churnHistory.getChurnCount(outputToChurn,
+            outputIndex: newOutputIndex);
         l("Successfully recorded churn. New count: $newCount");
         final analytics = churnHistory.getAnalytics();
-        if (stats && int.parse("${analytics['totalOutputs']}") > 0) {
+        if (stats &&
+            (analytics.containsKey("totalOutputs") &&
+                int.parse("${analytics['totalOutputs']}") > 0)) {
           l("   Churn history:");
           l("      Total outputs tracked: ${analytics['totalOutputs']}");
           l("      Total churns performed: ${analytics['totalChurns']}");
           l("      Average churns per output: ${analytics['averageChurns'].toStringAsFixed(2)}");
         }
       }
-    } catch (e) {
-      l("Warning: Failed to record churn: $e");
-      // Continue execution as this is not critical
+    } catch (e, s) {
+      l("Warning: Failed to record churn: $e\n$s");
+      // Continue execution as this is not critical.
     }
   } else {
     if (verbose) {
